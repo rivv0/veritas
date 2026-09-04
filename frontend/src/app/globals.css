@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-zinc-100 antialiased selection:bg-white selection:text-black font-sans;
+    letter-spacing: -0.01em;
+  }
+
+  /* Sharp edge reset preference */
+  button, input, select, textarea {
+    font-family: inherit;
+  }
+}
+
+@layer components {
+  .data-live {
+    @apply text-emerald-400;
+  }
+  .data-delayed {
+    @apply text-zinc-400;
+  }
+  .data-stale {
+    @apply text-red-400 opacity-60;
+  }
+}
+
+/* Minimalist Dark Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 0px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
