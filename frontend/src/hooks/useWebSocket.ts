@@ -11,7 +11,14 @@ export function useWebSocket(symbols: string[]) {
   const [stale, setStale] = useState(false);
 
   const connect = useCallback(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000/ws/v1/market';
+    let wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    if (!wsUrl || wsUrl.includes('veritas-backend.onrender.com')) {
+      if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+        wsUrl = 'wss://veritas-backend-6epf.onrender.com/ws/v1/market';
+      } else {
+        wsUrl = wsUrl || 'ws://localhost:4000/ws/v1/market';
+      }
+    }
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {

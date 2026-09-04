@@ -1,4 +1,13 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const getApiBase = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && !envUrl.includes('veritas-backend.onrender.com')) return envUrl;
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    return 'https://veritas-backend-6epf.onrender.com';
+  }
+  return envUrl || 'http://localhost:4000';
+};
+
+const API_BASE = getApiBase();
 
 export async function fetchWatchlists() {
   const res = await fetch(`${API_BASE}/api/v1/watchlists`, {
