@@ -4,6 +4,7 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   postgres: {
+    connectionString: process.env.DATABASE_URL,
     host: process.env.POSTGRES_HOST || 'localhost',
     port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
     database: process.env.POSTGRES_DB || 'watchlist_db',
@@ -11,6 +12,7 @@ export const config = {
     password: process.env.POSTGRES_PASSWORD || 'postgrespassword',
   },
   redis: {
+    url: process.env.REDIS_URL,
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
   },

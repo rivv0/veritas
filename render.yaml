@@ -1,0 +1,36 @@
+services:
+  # 1. Backend Web Service (REST API & Real-time WebSockets)
+  - type: web
+    name: veritas-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: veritas-db
+          property: connectionString
+
+  # 2. Frontend Next.js Web Application
+  - type: web
+    name: veritas-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://veritas-backend.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://veritas-backend.onrender.com/ws/v1/market
+
+databases:
+  - name: veritas-db
+    plan: free
+    databaseName: watchlist_db
+    user: postgres

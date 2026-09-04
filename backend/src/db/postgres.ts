@@ -1,16 +1,26 @@
 import { Pool } from 'pg';
 import { config } from '../config';
 
-export const pgPool = new Pool({
-  host: config.postgres.host,
-  port: config.postgres.port,
-  database: config.postgres.database,
-  user: config.postgres.user,
-  password: config.postgres.password,
-  max: 10,
-  idleTimeoutMillis: 5000,
-  connectionTimeoutMillis: 1500,
-});
+const poolConfig: any = config.postgres.connectionString
+  ? {
+      connectionString: config.postgres.connectionString,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 3000,
+    }
+  : {
+      host: config.postgres.host,
+      port: config.postgres.port,
+      database: config.postgres.database,
+      user: config.postgres.user,
+      password: config.postgres.password,
+      max: 10,
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 1500,
+    };
+
+export const pgPool = new Pool(poolConfig);
 
 let useInMemory = false;
 
