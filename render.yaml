@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: PORT
@@ -21,7 +21,7 @@ services:
     runtime: node
     plan: free
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NEXT_PUBLIC_API_URL
@@ -33,4 +33,4 @@ databases:
   - name: veritas-db
     plan: free
     databaseName: watchlist_db
-    user: postgres
+    user: veritas_user
