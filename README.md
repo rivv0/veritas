@@ -1,4 +1,4 @@
-# ⚡ VERITAS - Institutional Market Intelligence & Smart Watchlist Platform
+# VERITAS - Institutional Market Intelligence & Smart Watchlist Platform
 
 <div align="center">
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 📌 Overview
+##  Overview
 
 Traditional stock watchlists are static, noisy spreadsheets. They flood active traders with endless price flickering without context, forcing them to mentally calculate price deltas, cross-reference multiple indicators, and constantly fall victim to retail bull-traps (such as **Dead Cat Bounces**).
 
@@ -33,7 +33,7 @@ Traditional stock watchlists are static, noisy spreadsheets. They flood active t
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 VERITAS uses a decoupled, event-driven micro-architecture built for resilience, throughput, and sub-millisecond querying.
 
@@ -248,7 +248,7 @@ smart-watchlist/
 
 ---
 
-## 🗄️ Database Schema & TimescaleDB Setup
+##  Database Schema & TimescaleDB Setup
 
 The PostgreSQL / TimescaleDB schema is initialized automatically via [`init-db/init.sql`](file:///Users/rivva/groww/smart-watchlist/init-db/init.sql):
 
