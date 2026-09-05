@@ -204,10 +204,7 @@ export default function VeritasDashboard() {
             </button>
           </div>
 
-          <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono shrink-0">
-            <span className="w-1.5 h-1.5 bg-white" />
-            <span>L1/L2/L3 • Overbought/Oversold • X-EMA Telemetry</span>
-          </div>
+          
         </div>
 
         {/* Dashboard Grid Layout */}
