@@ -39,6 +39,7 @@ export class YahooClient {
               'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             Accept: 'application/json',
           },
+          signal: AbortSignal.timeout(3500),
         });
 
         if (!response.ok) continue;
@@ -63,8 +64,11 @@ export class YahooClient {
           (c): c is number => typeof c === 'number' && !isNaN(c)
         );
 
-        // Downsample intraday closes to 20-30 points for sparkline
-        const sparkline = this.downsample(validCloses, 24);
+        // Downsample intraday closes to 20-30 points for sparkline, or synthesize if market is closed / sparse
+        let sparkline = this.downsample(validCloses, 24);
+        if (sparkline.length < 6) {
+          sparkline = this.synthesizeIntradayCurve(open, high, low, close, ltp, 24);
+        }
 
         const spread = Number((ltp * 0.0005).toFixed(2));
         const change = Number((ltp - close).toFixed(2));
@@ -81,7 +85,7 @@ export class YahooClient {
           low,
           open,
           close,
-          sparkline: sparkline.length > 0 ? sparkline : [close, ltp],
+          sparkline,
           change,
           changePercent,
         };
@@ -99,6 +103,29 @@ export class YahooClient {
     }
 
     return null;
+  }
+
+  private synthesizeIntradayCurve(open: number, high: number, low: number, close: number, ltp: number, points = 24): number[] {
+    const curve: number[] = [Number(open.toFixed(2))];
+    const isBullish = ltp >= close;
+    const extreme1 = isBullish ? low : high;
+    const extreme2 = isBullish ? high : low;
+
+    for (let i = 1; i < points - 1; i++) {
+      const progress = i / (points - 1);
+      let target: number;
+      if (progress < 0.35) {
+        target = open + (extreme1 - open) * (progress / 0.35);
+      } else if (progress < 0.7) {
+        target = extreme1 + (extreme2 - extreme1) * ((progress - 0.35) / 0.35);
+      } else {
+        target = extreme2 + (ltp - extreme2) * ((progress - 0.7) / 0.3);
+      }
+      const noise = (Math.random() - 0.5) * (ltp * 0.0015);
+      curve.push(Number((target + noise).toFixed(2)));
+    }
+    curve.push(Number(ltp.toFixed(2)));
+    return curve;
   }
 
   private downsample(data: number[], targetPoints: number): number[] {

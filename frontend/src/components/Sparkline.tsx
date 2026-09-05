@@ -1,4 +1,4 @@
-'use client';
+import React, { useId, useMemo } from 'react';
 
 interface Props {
   data?: number[];
@@ -8,63 +8,87 @@ interface Props {
 }
 
 export function Sparkline({ data = [], isPositive, width = 110, height = 32 }: Props) {
-  if (!data || data.length < 2) {
+  const gradientId = useId();
+
+  const chart = useMemo(() => {
+    if (!data || data.length === 0) return null;
+
+    // If only 1 point, expand to 2 points for a steady line
+    const pointsData = data.length === 1 ? [data[0], data[0]] : data;
+
+    const min = Math.min(...pointsData);
+    const max = Math.max(...pointsData);
+    const range = max - min;
+    const isFlat = range === 0 || !isFinite(range);
+
+    const paddingY = 4;
+    const paddingX = 2;
+    const drawWidth = width - paddingX * 2;
+    const drawHeight = height - paddingY * 2;
+
+    // Compute coordinate points
+    const points = pointsData.map((val, idx) => {
+      const x = paddingX + (idx / (pointsData.length - 1)) * drawWidth;
+      const y = isFlat
+        ? height / 2
+        : paddingY + drawHeight - ((val - min) / range) * drawHeight;
+      return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)), val };
+    });
+
+    // Build smooth SVG curve path using bezier control points
+    let pathD = `M ${points[0].x},${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const cx = (p0.x + p1.x) / 2;
+      pathD += ` C ${cx},${p0.y} ${cx},${p1.y} ${p1.x},${p1.y}`;
+    }
+
+    const lastPt = points[points.length - 1];
+    const areaD = `${pathD} L ${lastPt.x},${height} L ${points[0].x},${height} Z`;
+
+    return { pathD, areaD, lastPt, isFlat };
+  }, [data, width, height]);
+
+  if (!chart) {
     return (
       <div 
         style={{ width, height }} 
-        className="flex items-center justify-center text-[10px] text-gray-600 font-mono"
+        className="flex items-center justify-center text-[10px] text-zinc-600 font-mono"
       >
         —
       </div>
     );
   }
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-
-  const padding = 3;
-  const drawWidth = width - padding * 2;
-  const drawHeight = height - padding * 2;
-
-  // Compute SVG points
-  const points = data.map((val, idx) => {
-    const x = padding + (idx / (data.length - 1)) * drawWidth;
-    const y = padding + drawHeight - ((val - min) / range) * drawHeight;
-    return { x, y };
-  });
-
-  const pathD = points.reduce((acc, pt, i) => {
-    return i === 0 ? `M ${pt.x},${pt.y}` : `${acc} L ${pt.x},${pt.y}`;
-  }, '');
-
-  // Fill area under curve
-  const areaD = `${pathD} L ${points[points.length - 1].x},${height} L ${points[0].x},${height} Z`;
-
-  const strokeColor = isPositive ? '#10b981' : '#ef4444';
-  const gradientId = `spark-grad-${Math.random().toString(36).substring(2, 9)}`;
+  const strokeColor = isPositive ? '#34d399' : '#f87171';
 
   return (
-    <svg width={width} height={height} className="overflow-visible select-none">
+    <svg width={width} height={height} className="overflow-visible select-none shrink-0">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.28" />
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.25" />
           <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
         </linearGradient>
       </defs>
-      <path d={areaD} fill={`url(#${gradientId})`} />
+
+      {/* Gradient Fill Under Curve */}
+      <path d={chart.areaD} fill={`url(#${gradientId})`} />
+
+      {/* Intraday Line Trace */}
       <path
-        d={pathD}
+        d={chart.pathD}
         fill="none"
         stroke={strokeColor}
-        strokeWidth="1.75"
+        strokeWidth="1.65"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Latest price endpoint dot */}
+
+      {/* Real-time endpoint beacon */}
       <circle
-        cx={points[points.length - 1].x}
-        cy={points[points.length - 1].y}
+        cx={chart.lastPt.x}
+        cy={chart.lastPt.y}
         r="2"
         fill={strokeColor}
       />

@@ -397,6 +397,20 @@ export function WatchlistTable({
               const isDragging = draggedIndex === idx;
               const isDragOver = dragOverIndex === idx;
 
+              // Derive real-time dynamic sparkline data incorporating live tick
+              const currentSparkline = (() => {
+                const base = snap?.sparkline || [];
+                if (base.length === 0) return [fallbackPrice];
+                if (!tick?.ltp) return base;
+                // If latest point differs from live tick, append or update endpoint
+                if (Math.abs(base[base.length - 1] - tick.ltp) > 0.01) {
+                  return [...base.slice(-23), tick.ltp];
+                }
+                return base;
+              })();
+
+              const liveChange = tick?.ltp ? (tick.ltp - (tick.close || snap?.close || tick.ltp)) : fallbackChange;
+
               return (
                 <tr
                   key={symbol}
@@ -482,8 +496,8 @@ export function WatchlistTable({
                       title={`Click to open VERITAS institutional chart & warnings for ${symbol}`}
                     >
                       <Sparkline
-                        data={snap?.sparkline}
-                        isPositive={fallbackChange >= 0}
+                        data={currentSparkline}
+                        isPositive={liveChange >= 0}
                         width={90}
                         height={24}
                       />

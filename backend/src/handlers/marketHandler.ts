@@ -80,7 +80,9 @@ export class MarketHandler {
           if (liveData) {
             marketSimulator.updateRealQuote(liveData);
 
-            const sparkline = liveData.sparkline || existing?.sparkline || [liveData.close || liveData.ltp, liveData.ltp];
+            const sparkline = (liveData.sparkline && liveData.sparkline.length >= 6)
+              ? liveData.sparkline
+              : marketSimulator.getSparkline(symbol, liveData.ltp, liveData.close || liveData.ltp);
             const changePercent = liveData.changePercent ?? (existing?.changePercent || 0);
             const high = liveData.high || existing?.high || liveData.ltp;
             const low = liveData.low || existing?.low || liveData.ltp;
@@ -108,7 +110,9 @@ export class MarketHandler {
           }
 
           if (existing) {
-            const sparkline = existing.sparkline || [existing.close, existing.ltp];
+            const sparkline = (existing.sparkline && existing.sparkline.length >= 6)
+              ? existing.sparkline
+              : marketSimulator.getSparkline(symbol, existing.ltp, existing.close);
             const structure = calculateMarketStructure(symbol, existing.ltp, existing.changePercent, sparkline, existing.high, existing.low);
             return {
               ...existing,
@@ -119,7 +123,7 @@ export class MarketHandler {
 
           // Fallback if brand new symbol not yet in repo or Yahoo
           const basePrice = 1000;
-          const fallbackSparkline = [basePrice, basePrice];
+          const fallbackSparkline = marketSimulator.getSparkline(symbol, basePrice, basePrice);
           const structure = calculateMarketStructure(symbol, basePrice, 0, fallbackSparkline, basePrice, basePrice);
           return {
             symbol,

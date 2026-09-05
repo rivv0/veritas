@@ -35,23 +35,72 @@ export class MarketSimulator {
   private dayHighs: Map<string, number> = new Map();
   private dayLows: Map<string, number> = new Map();
   private baseVolumes: Map<string, number> = new Map();
+  private sparklines: Map<string, number[]> = new Map();
 
   constructor() {
     Object.entries(INITIAL_PRICES).forEach(([symbol, price]) => {
       this.currentPrices.set(symbol, price);
-      this.baseCloses.set(symbol, price * (1 + (Math.random() * 0.01 - 0.005)));
+      const close = price * (1 + (Math.random() * 0.01 - 0.005));
+      this.baseCloses.set(symbol, close);
       this.dayHighs.set(symbol, price * 1.015);
       this.dayLows.set(symbol, price * 0.985);
       this.baseVolumes.set(symbol, 1200000);
+
+      // Generate realistic 24-point intraday baseline trajectory
+      this.sparklines.set(symbol, this.generateInitialTrajectory(close, price));
     });
   }
 
-  updateRealQuote(quote: { symbol: string; ltp: number; close?: number; high?: number; low?: number; volume?: number }) {
+  private generateInitialTrajectory(startPrice: number, endPrice: number, points = 24): number[] {
+    const trajectory: number[] = [Number(startPrice.toFixed(2))];
+    let current = startPrice;
+    const netTrend = (endPrice - startPrice) / points;
+
+    for (let i = 1; i < points - 1; i++) {
+      const noise = (Math.random() - 0.48) * (startPrice * 0.004);
+      current = Math.max(startPrice * 0.92, current + netTrend + noise);
+      trajectory.push(Number(current.toFixed(2)));
+    }
+    trajectory.push(Number(endPrice.toFixed(2)));
+    return trajectory;
+  }
+
+  getSparkline(symbol: string, currentLtp?: number, baseClose?: number): number[] {
+    const existing = this.sparklines.get(symbol);
+    if (existing && existing.length >= 6) {
+      if (currentLtp && Math.abs(existing[existing.length - 1] - currentLtp) > 0.01) {
+        return [...existing.slice(0, existing.length - 1), Number(currentLtp.toFixed(2))];
+      }
+      return existing;
+    }
+
+    const start = baseClose || currentLtp || INITIAL_PRICES[symbol] || 1000;
+    const end = currentLtp || start;
+    const generated = this.generateInitialTrajectory(start, end);
+    this.sparklines.set(symbol, generated);
+    return generated;
+  }
+
+  updateRealQuote(quote: { symbol: string; ltp: number; close?: number; high?: number; low?: number; volume?: number; sparkline?: number[] }) {
     this.currentPrices.set(quote.symbol, quote.ltp);
     if (quote.close) this.baseCloses.set(quote.symbol, quote.close);
     if (quote.high) this.dayHighs.set(quote.symbol, Math.max(quote.high, quote.ltp));
     if (quote.low) this.dayLows.set(quote.symbol, Math.min(quote.low, quote.ltp));
     if (quote.volume) this.baseVolumes.set(quote.symbol, quote.volume);
+
+    if (quote.sparkline && quote.sparkline.length >= 6) {
+      this.sparklines.set(quote.symbol, quote.sparkline);
+    } else {
+      const existing = this.sparklines.get(quote.symbol);
+      const close = quote.close || quote.ltp;
+      if (!existing || existing.length < 6) {
+        this.sparklines.set(quote.symbol, this.generateInitialTrajectory(close, quote.ltp));
+      } else {
+        // Append or recalibrate latest point
+        const updated = [...existing.slice(-23), Number(quote.ltp.toFixed(2))];
+        this.sparklines.set(quote.symbol, updated);
+      }
+    }
   }
 
   generateTick(symbol: string): Tick {
@@ -70,6 +119,14 @@ export class MarketSimulator {
     const low = Math.min(newPrice, this.dayLows.get(symbol) || newPrice);
     this.dayHighs.set(symbol, high);
     this.dayLows.set(symbol, low);
+
+    // Roll sparkline
+    const history = this.sparklines.get(symbol) || this.generateInitialTrajectory(baseClose, prevPrice);
+    if (history.length >= 28) {
+      this.sparklines.set(symbol, [...history.slice(1), newPrice]);
+    } else {
+      this.sparklines.set(symbol, [...history, newPrice]);
+    }
 
     const spread = Number((newPrice * 0.0004).toFixed(2));
     const isVolumeSurge = Math.random() < 0.04;
