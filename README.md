@@ -1,4 +1,4 @@
-# ⚡ VERITAS — Institutional Market Intelligence & Smart Watchlist Platform
+# ⚡ VERITAS - Institutional Market Intelligence & Smart Watchlist Platform
 
 <div align="center">
 
@@ -8,7 +8,7 @@
 ![TimescaleDB](https://img.shields.io/badge/TimescaleDB-PostgreSQL%2015-FDB515?style=for-the-badge&logo=postgresql&logoColor=black)
 ![Redis](https://img.shields.io/badge/Redis%207-Pub%2FSub-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+
 
 **Sub-50ms streaming market telemetry, automated bull-trap detection, institutional flow analysis, and session delta intelligence for active equity & derivative traders.**
 
@@ -283,17 +283,16 @@ The PostgreSQL / TimescaleDB schema is initialized automatically via [`init-db/i
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-Ensure you have the following installed on your workstation:
 - [Docker & Docker Compose](https://docs.docker.com/get-docker/) (Recommended)
 - *OR* [Node.js 18+](https://nodejs.org/), [PostgreSQL 15](https://www.postgresql.org/), and [Redis 7](https://redis.io/) for manual setup.
 
 ---
 
-### Option A: One-Command Setup with Docker Compose (Recommended)
+### Option A: Setup with Docker Compose 
 
 Clone the repository and launch the entire multi-container stack:
 
@@ -319,7 +318,7 @@ docker compose down
 
 ---
 
-### Option B: Local Development Setup (Manual)
+### Option B: Local Development Setup
 
 #### 1. Start PostgreSQL & Redis
 Ensure PostgreSQL (with TimescaleDB extension if available) and Redis are running locally:
@@ -525,19 +524,6 @@ Clients establish a single WebSocket connection to receive real-time ticks and h
 
 ---
 
-## 🌐 Production Cloud Deployment
-
-The repository includes a ready-to-deploy **Render Blueprint** ([`render.yaml`](file:///Users/rivva/groww/smart-watchlist/render.yaml)) provisioning:
-1. **`veritas-backend`**: Node.js Web Service running REST API and WebSocket gateway.
-2. **`veritas-frontend`**: Next.js 14 Web Application.
-3. **`veritas-db`**: Managed PostgreSQL Database.
-
-### Deploy to Render in 3 Steps:
-1. Fork or push this repository to GitHub.
-2. In Render, navigate to **Blueprints** and click **New Blueprint Instance**.
-3. Select your repository. Render will automatically parse `render.yaml` and configure services, environment variables, and connections.
-
----
 
 ## 🔬 Testing & Interactive Demo Scenarios
 
@@ -566,6 +552,3 @@ VERITAS is pre-configured with realistic scenarios for evaluation:
 
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
