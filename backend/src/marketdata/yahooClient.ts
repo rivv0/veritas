@@ -14,6 +14,15 @@ interface CacheEntry {
 export class YahooClient {
   private cache: Map<string, CacheEntry> = new Map();
   private cacheTTLMs = 60000; // 60 seconds cache to prevent spamming and rate-limiting
+  private throttleQueue: Promise<void> = Promise.resolve();
+  private minIntervalMs = 180; // Pacing between Yahoo calls to completely avoid 429 rate limits
+
+  private throttle(): Promise<void> {
+    this.throttleQueue = this.throttleQueue.then(
+      () => new Promise((resolve) => setTimeout(resolve, this.minIntervalMs))
+    );
+    return this.throttleQueue;
+  }
 
   async fetchQuote(symbol: string): Promise<LiveStockData | null> {
     const cleanSym = symbol.trim().toUpperCase();
@@ -22,14 +31,20 @@ export class YahooClient {
       return cached.data;
     }
 
+    const SYMBOL_ALIASES: Record<string, string[]> = {
+      TATAMOTORS: ['TMCV.NS', 'TMPV.NS', 'TATAMOTORS.NS'],
+      ZOMATO: ['ETERNAL.NS', 'ZOMATO.NS'],
+    };
+
     // Try primary symbol (append .NS if no suffix), then fallback to raw symbol
-    const candidates = cleanSym.includes('.')
+    const candidates = SYMBOL_ALIASES[cleanSym] || (cleanSym.includes('.')
       ? [cleanSym]
-      : [`${cleanSym}.NS`, cleanSym];
+      : [`${cleanSym}.NS`, cleanSym]);
 
     for (const candidate of candidates) {
       for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
         try {
+          await this.throttle();
           const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
             candidate
           )}?interval=1m&range=1d`;
