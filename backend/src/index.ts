@@ -35,13 +35,18 @@ app.get('/api/v1/news', (req, res) => marketHandler.getNews(req, res));
 
 const server = http.createServer(app);
 
+import { initPostgresSchema } from './db/postgres';
+
 // Initialize WebSocket server
 wsManager.init(server);
 
 // Start HTTP & WebSocket server
-server.listen(config.port, () => {
+server.listen(config.port, async () => {
   console.log(`Smart Watchlist Backend API listening on port ${config.port}`);
   console.log(`WebSocket server endpoint: ws://localhost:${config.port}/ws/v1/market`);
+
+  // Initialize remote database schema if configured
+  await initPostgresSchema();
 
   // Start market tick streaming loop
   marketDataService.startTickStream();

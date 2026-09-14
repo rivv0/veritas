@@ -332,3 +332,77 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
 
   return [] as any;
 }
+
+export async function initPostgresSchema() {
+  if (!config.postgres.connectionString && (!config.postgres.host || config.postgres.host === 'localhost')) {
+    return;
+  }
+  try {
+    const client = await pgPool.connect();
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(64) PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS watchlists (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            sort_order INT DEFAULT 0,
+            is_default BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS watchlist_items (
+            id VARCHAR(64) PRIMARY KEY,
+            watchlist_id VARCHAR(64) NOT NULL,
+            symbol VARCHAR(32) NOT NULL,
+            sort_order INT DEFAULT 0,
+            added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(watchlist_id, symbol)
+        );
+        CREATE TABLE IF NOT EXISTS market_ticks (
+            timestamp TIMESTAMPTZ NOT NULL,
+            symbol VARCHAR(32) NOT NULL,
+            ltp NUMERIC(12, 4) NOT NULL,
+            volume BIGINT DEFAULT 0,
+            bid NUMERIC(12, 4),
+            ask NUMERIC(12, 4),
+            high NUMERIC(12, 4),
+            low NUMERIC(12, 4),
+            open NUMERIC(12, 4),
+            close NUMERIC(12, 4)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ticks_symbol_time ON market_ticks (symbol, timestamp DESC);
+        CREATE TABLE IF NOT EXISTS signals (
+            id VARCHAR(64) PRIMARY KEY,
+            symbol VARCHAR(32) NOT NULL,
+            signal_type VARCHAR(64) NOT NULL,
+            severity INT NOT NULL,
+            description TEXT,
+            metadata JSONB DEFAULT '{}'::jsonb,
+            triggered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_signals_symbol_time ON signals (symbol, triggered_at DESC);
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            user_id VARCHAR(64) NOT NULL,
+            device_fp VARCHAR(64) NOT NULL,
+            last_seen_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_watchlist_id VARCHAR(64),
+            PRIMARY KEY (user_id, device_fp)
+        );
+      `);
+      console.log('[PostgreSQL] Connected successfully to remote database & schema initialized!');
+      useInMemory = false;
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    console.log(`[PostgreSQL] Connection failed (${err.message}). Active In-Memory engine engaged.`);
+    useInMemory = true;
+  }
+}
+
