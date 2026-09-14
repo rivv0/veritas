@@ -1,14 +1,6 @@
 import { Tick, Signal, SignalType } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-function getNearestStrike(ltp: number): number {
-  if (ltp < 200) return Math.round(ltp / 5) * 5;
-  if (ltp < 500) return Math.round(ltp / 10) * 10;
-  if (ltp < 1500) return Math.round(ltp / 20) * 20;
-  if (ltp < 3000) return Math.round(ltp / 50) * 50;
-  return Math.round(ltp / 100) * 100;
-}
-
 export function calculateOptionsFlow(
   currTick: Tick,
   prevTick: Tick | null,
@@ -21,79 +13,74 @@ export function calculateOptionsFlow(
   const tickJump = ((currTick.ltp - prevTick.ltp) / prevTick.ltp) * 100;
   const volRatio = currTick.volume / Math.max(avgVolume20d, 10000);
 
-  // Strict institutional conditions:
-  // Must have high relative volume (>2.0x 20d avg) AND strong directional thrust
-  const isBullishSurge = volRatio >= 2.0 && percentMove >= 2.0 && tickJump >= 0.35;
-  const isBearishSurge = volRatio >= 2.0 && percentMove <= -2.0 && tickJump <= -0.35;
+  // Deterministic institutional order flow conditions:
+  // Requires significant relative volume expansion (>=2.0x 20d average)
+  // combined with strong directional displacement and instantaneous velocity
+  const isBullishSurge = volRatio >= 2.0 && percentMove >= 1.5 && tickJump >= 0.20;
+  const isBearishSurge = volRatio >= 2.0 && percentMove <= -1.5 && tickJump <= -0.20;
 
-  // Ultra-rare institutional block trade sweep event (0.2% probability during active hours)
-  const isRareBlockSweep = (Math.abs(percentMove) >= 1.5 && Math.abs(tickJump) >= 0.25 && Math.random() < 0.003);
-
-  if (!isBullishSurge && !isBearishSurge && !isRareBlockSweep) {
+  if (!isBullishSurge && !isBearishSurge) {
     return null;
   }
 
-  const isBullish = isBullishSurge || (isRareBlockSweep && percentMove > 0);
-  const strike = getNearestStrike(currTick.ltp);
+  const isBullish = isBullishSurge;
   const timestamp = currTick.timestamp || new Date();
+  const turnoverCr = Number(((currTick.volume * currTick.ltp) / 10000000).toFixed(1));
+  const volMultiple = Number(volRatio.toFixed(1));
+  const absMove = Math.abs(percentMove);
+  const severity = Math.min(95, Math.max(78, Math.round(75 + absMove * 5)));
 
   if (isBullish) {
-    const oiSurge = Number((24 + Math.random() * 20).toFixed(1));
-    const blockEst = Number((28 + Math.random() * 32).toFixed(1));
-    const severity = Math.min(95, Math.max(78, Math.round(75 + Math.abs(percentMove) * 6)));
-
     return {
       id: `sig-${uuidv4().slice(0, 8)}`,
       symbol: currTick.symbol,
       signalType: SignalType.OPTIONS_FLOW,
       severity,
-      description: `${currTick.symbol}: Institutional Smart Money ₹${strike} CE Long Buildup (+${oiSurge}% OI) • Ask Block Sweeps`,
+      description: `${currTick.symbol}: Institutional Block Accumulation • ${volMultiple}x Volume Surge (Est. ₹${turnoverCr} Cr Turnover)`,
       metadata: {
-        strike,
-        optionType: 'CE',
-        action: 'LONG_BUILDUP',
-        oiSurgePercent: oiSurge,
-        estimatedBlockCr: blockEst,
+        action: 'INSTITUTIONAL_BUY_BLOCK',
+        volumeRatio: volMultiple,
+        estimatedTurnoverCr: turnoverCr,
         sentiment: 'BULLISH',
         ltp: currTick.ltp,
-        rationale: `Heavy Call accumulation detected at ₹${strike} CE with ${oiSurge}% open interest expansion and ₹${blockEst} Cr block sweeps`,
+        percentMove: Number(percentMove.toFixed(2)),
+        tickJump: Number(tickJump.toFixed(2)),
+        rationale: `Aggressive institutional buyer absorption detected with ${volMultiple}x 20-day average volume expansion and ₹${turnoverCr} Cr traded value`,
         keyStats: [
-          { label: 'Target Strike', value: `₹${strike} CE` },
-          { label: 'Open Interest', value: `+${oiSurge}% Contracts` },
-          { label: 'Block Volume', value: `₹${blockEst} Cr` },
-          { label: 'Flow Direction', value: 'Bullish Ask Sweep' },
+          { label: 'Traded Turnover', value: `₹${turnoverCr} Cr` },
+          { label: 'Volume Surge', value: `${volMultiple}x 20d Avg` },
+          { label: 'Session Gain', value: `+${percentMove.toFixed(2)}%` },
+          { label: 'Flow Direction', value: 'Aggressive Buyer Lift' },
         ],
       },
       triggeredAt: timestamp,
     };
   } else {
-    const oiSurge = Number((22 + Math.random() * 18).toFixed(1));
-    const blockEst = Number((22 + Math.random() * 26).toFixed(1));
-    const severity = Math.min(95, Math.max(78, Math.round(75 + Math.abs(percentMove) * 6)));
-
     return {
       id: `sig-${uuidv4().slice(0, 8)}`,
       symbol: currTick.symbol,
       signalType: SignalType.OPTIONS_FLOW,
       severity,
-      description: `${currTick.symbol}: Institutional Hedging ₹${strike} PE Accumulation (+${oiSurge}% OI) • High Bid Selling`,
+      description: `${currTick.symbol}: Institutional Block Liquidation • ${volMultiple}x Volume Surge (Est. ₹${turnoverCr} Cr Turnover)`,
       metadata: {
-        strike,
-        optionType: 'PE',
-        action: 'PUT_SWEEP',
-        oiSurgePercent: oiSurge,
-        estimatedBlockCr: blockEst,
+        action: 'INSTITUTIONAL_SELL_BLOCK',
+        volumeRatio: volMultiple,
+        estimatedTurnoverCr: turnoverCr,
         sentiment: 'BEARISH',
         ltp: currTick.ltp,
-        rationale: `Heavy Put buying detected at ₹${strike} PE (+${oiSurge}% OI) signalling institutional downside hedging`,
+        percentMove: Number(percentMove.toFixed(2)),
+        tickJump: Number(tickJump.toFixed(2)),
+        rationale: `Heavy institutional block distribution detected with ${volMultiple}x 20-day average volume expansion and ₹${turnoverCr} Cr traded value`,
         keyStats: [
-          { label: 'Target Strike', value: `₹${strike} PE` },
-          { label: 'Open Interest', value: `+${oiSurge}% Contracts` },
-          { label: 'Block Volume', value: `₹${blockEst} Cr` },
-          { label: 'Flow Direction', value: 'Bearish Put Sweep' },
+          { label: 'Traded Turnover', value: `₹${turnoverCr} Cr` },
+          { label: 'Volume Surge', value: `${volMultiple}x 20d Avg` },
+          { label: 'Session Drop', value: `${percentMove.toFixed(2)}%` },
+          { label: 'Flow Direction', value: 'Aggressive Seller Hit' },
         ],
       },
       triggeredAt: timestamp,
     };
   }
 }
+
+export const calculateInstitutionalFlow = calculateOptionsFlow;

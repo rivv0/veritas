@@ -27,6 +27,13 @@ export function calculateVolumeAnomaly(
         currentVolume,
         avgVolume20d,
         volumeRatio,
+        keyStats: [
+          { label: 'Volume Ratio', value: `${volumeRatio}x 20d Avg` },
+          { label: 'Current Traded', value: `${(currentVolume / 100000).toFixed(1)}L Shares` },
+          { label: '20d Avg Baseline', value: `${(avgVolume20d / 100000).toFixed(1)}L Shares` },
+          { label: 'Anomaly State', value: 'High Participation' },
+        ],
+        rationale: `Unusual institutional volume expansion: current volume is ${volumeRatio}x of the 20-day historical daily average.`,
       },
       triggeredAt: tick.timestamp,
     };

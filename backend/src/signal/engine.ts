@@ -4,6 +4,8 @@ import { calculatePriceBreakout } from './breakout';
 import { calculateOptionsFlow } from './optionsFlow';
 import { calculateMomentumReversal } from './momentumReversal';
 import { calculateDeadCatBounce } from './deadCatBounce';
+import { calculateVolumeAnomaly } from './volume';
+import { calculateSectorDivergence, NIFTY_SECTOR_MAP } from './divergence';
 import { query } from '../db/postgres';
 
 export class SignalEngine {
@@ -30,8 +32,10 @@ export class SignalEngine {
       rawSignals.push(breakoutSignal);
     }
 
-    // 2. Institutional Options Flow & Smart Money Buildup
-    if (!this.base20dVolumes.has(tick.symbol)) {
+    // 2. Institutional Order Flow & Block Accumulation
+    if (tick.avgVolume20d && tick.avgVolume20d > 0) {
+      this.base20dVolumes.set(tick.symbol, tick.avgVolume20d);
+    } else if (!this.base20dVolumes.has(tick.symbol)) {
       this.base20dVolumes.set(tick.symbol, tick.volume || 1000000);
     }
     const avgVolume20d = this.base20dVolumes.get(tick.symbol) || 1000000;
@@ -59,6 +63,36 @@ export class SignalEngine {
     const dcbSignal = calculateDeadCatBounce(tick, prevTick);
     if (dcbSignal) {
       rawSignals.push(dcbSignal);
+    }
+
+    // 6. Volume Anomaly (Unusual institutional participation >= 1.5x 20d average)
+    const volAnomalySignal = calculateVolumeAnomaly(tick, avgVolume20d);
+    if (volAnomalySignal) {
+      rawSignals.push(volAnomalySignal);
+    }
+
+    // 7. Sector Divergence (Decoupling >= 1.2% from sector peers)
+    const sectorInfo = NIFTY_SECTOR_MAP[tick.symbol];
+    if (sectorInfo) {
+      let peerReturnSum = 0;
+      let peerCount = 0;
+      for (const [sym, peerTick] of this.lastTicks.entries()) {
+        if (sym !== tick.symbol && NIFTY_SECTOR_MAP[sym]?.index === sectorInfo.index) {
+          const peerClose = peerTick.close || peerTick.open || peerTick.ltp;
+          if (peerClose > 0) {
+            peerReturnSum += ((peerTick.ltp - peerClose) / peerClose) * 100;
+            peerCount++;
+          }
+        }
+      }
+      if (peerCount > 0) {
+        const sectorAvgReturn = peerReturnSum / peerCount;
+        const baseClose = tick.close || tick.open || tick.ltp;
+        const divergenceSignal = calculateSectorDivergence(tick, baseClose, sectorAvgReturn);
+        if (divergenceSignal) {
+          rawSignals.push(divergenceSignal);
+        }
+      }
     }
 
     // Update last tick cache

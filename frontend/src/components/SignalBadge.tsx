@@ -29,7 +29,7 @@ const iconMap: Record<string, React.ReactNode> = {
 
 const labelMap: Record<string, string> = {
   PRICE_BREAKOUT: 'Breakout',
-  OPTIONS_FLOW: 'Options Flow',
+  OPTIONS_FLOW: 'Institutional Flow',
   MOMENTUM_REVERSAL: 'Reversal',
   VOLATILITY_SPIKE: 'Volatility Move',
   NEWS_VELOCITY: 'News Catalyst',
@@ -59,16 +59,15 @@ export function SignalBadge({ type, signalType, severity, description, metadata 
       ];
       rationale = 'Price velocity broke above intraday resistance on aggressive buying';
     } else if (resolvedType === 'OPTIONS_FLOW') {
-      const strike = meta.strike || 2200;
-      const oi = meta.oiSurgePercent || 24;
-      const block = meta.estimatedBlockCr || 28;
+      const block = meta.estimatedTurnoverCr || meta.estimatedBlockCr || 25;
+      const vol = meta.volumeRatio || 2.2;
       keyStats = [
-        { label: 'Target Strike', value: `₹${strike} CE` },
-        { label: 'OI Expansion', value: `+${oi}% Contracts` },
-        { label: 'Block Volume', value: `₹${block} Cr` },
-        { label: 'Flow Direction', value: 'Ask Sweeps' },
+        { label: 'Traded Turnover', value: `₹${block} Cr` },
+        { label: 'Volume Surge', value: `${vol}x 20d Avg` },
+        { label: 'Order Flow', value: 'Institutional Sweep' },
+        { label: 'Confidence', value: `${severity}%` },
       ];
-      rationale = 'Heavy Call OI build-up and institutional block absorption';
+      rationale = 'Substantial institutional order flow and volume surge detected';
     } else if (resolvedType === 'MOMENTUM_REVERSAL') {
       const jump = meta.tickJumpPercent || 0.35;
       keyStats = [

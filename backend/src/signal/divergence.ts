@@ -85,6 +85,13 @@ export function calculateSectorDivergence(
         divergence,
         sectorIndex: sectorInfo.index,
         sectorName: sectorInfo.name,
+        keyStats: [
+          { label: 'Divergence', value: `${divergence >= 0 ? '+' : ''}${divergence}%` },
+          { label: 'Stock Move', value: `${stockChangePercent >= 0 ? '+' : ''}${stockChangePercent.toFixed(2)}%` },
+          { label: 'Sector Benchmark', value: `${sectorInfo.name}` },
+          { label: 'Bias', value: isOutperforming ? 'Alpha Leader' : 'Lagging Sector' },
+        ],
+        rationale: `${stockTick.symbol} has decoupled from ${sectorInfo.name} by ${Math.abs(divergence)}%, signalling idiosyncratic institutional momentum.`,
       },
       triggeredAt: stockTick.timestamp,
     };

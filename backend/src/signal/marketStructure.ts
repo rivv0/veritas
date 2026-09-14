@@ -50,7 +50,7 @@ export function calculateMarketStructure(
   if (series.length < 6) {
     // Reconstruct honest intraday trajectory from baseline close to ltp using changePercent
     const basePrice = ltp / (1 + (changePercent || 0) / 100);
-    const steps = 14;
+    const steps = 20;
     series = [];
     for (let i = 0; i <= steps; i++) {
       const progress = i / steps;
@@ -58,7 +58,7 @@ export function calculateMarketStructure(
     }
   }
 
-  const period = Math.min(series.length, 14);
+  const period = Math.min(series.length, 20);
   const k = 2 / (period + 1);
   let ema = series[0];
   for (let i = 1; i < series.length; i++) {
