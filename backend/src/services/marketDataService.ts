@@ -1,15 +1,18 @@
 import { config } from '../config';
 import { marketSimulator } from '../marketdata/simulator';
 import { yfCandleClient } from '../marketdata/yfCandleClient';
+import { yahooClient } from '../marketdata/yahooClient';
 import { watchlistService } from './watchlistService';
 import { tickRepository } from '../repositories/tickRepository';
 import { signalEngine } from '../signal/engine';
 import { redisPub } from '../db/redis';
 import { wsManager } from '../websocket';
+import { query } from '../db/postgres';
 
 export class MarketDataService {
   private timer: NodeJS.Timeout | null = null;
   private realSyncTimer: NodeJS.Timeout | null = null;
+  private statsSyncTimer: NodeJS.Timeout | null = null;
   private trackedSymbols: Set<string> = new Set(config.market.symbols);
 
   async refreshTrackedSymbols() {
@@ -86,17 +89,43 @@ export class MarketDataService {
     }
   }
 
+  async syncSymbolStats() {
+    await this.refreshTrackedSymbols();
+    const symbols = Array.from(this.trackedSymbols);
+    for (const symbol of symbols) {
+      try {
+        const avgVol = await yahooClient.fetch20DayAvgVolume(symbol);
+        if (avgVol && avgVol > 0) {
+          const sql = `
+            INSERT INTO symbol_stats (symbol, avg_volume_20d, updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (symbol) DO UPDATE SET avg_volume_20d = EXCLUDED.avg_volume_20d, updated_at = NOW()
+          `;
+          await query(sql, [symbol, avgVol]);
+        }
+      } catch (err) {
+        // Continue to next symbol
+      }
+    }
+  }
+
   startTickStream() {
     if (this.realSyncTimer) return;
     console.log('[MarketDataService] Starting Real-Feed Market Data Streamer (Yahoo 1m Candles)...');
 
-    // 1. Immediate real market candle sync
+    // 1. Immediate real market candle sync & true 20-day volume history sync
     this.syncRealQuotes().catch(console.error);
+    this.syncSymbolStats().catch(console.error);
 
     // 2. Continuous real market polling cycle (every 15s for high-resolution candle updates)
     this.realSyncTimer = setInterval(() => {
       this.syncRealQuotes().catch(console.error);
     }, 15000);
+
+    // 3. Daily 20-day average volume refresh cycle (every 24 hours)
+    this.statsSyncTimer = setInterval(() => {
+      this.syncSymbolStats().catch(console.error);
+    }, 24 * 60 * 60 * 1000);
 
     // 3. Optional offline/after-hours Brownian motion micro-tick simulator (only if explicitly enabled)
     if (process.env.ENABLE_SYNTHETIC_SIMULATOR === 'true') {

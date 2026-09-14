@@ -4,7 +4,6 @@ import { tickRepository } from '../repositories/tickRepository';
 import { signalService } from './signalService';
 import { computeAttentionScore } from '../signal/attention';
 import { calculateMarketStructure } from '../signal/marketStructure';
-import { marketSimulator } from '../marketdata/simulator';
 import { WatchlistDigest, DigestItem } from '../domain/types';
 
 export class DigestService {
@@ -67,8 +66,8 @@ export class DigestService {
       const low = currentTick.low || (baseClose * 0.985);
       const dayRangePercent = low > 0 ? Number((((high - low) / low) * 100).toFixed(2)) : 1.5;
 
-      // Dynamic relative volume ratio against symbol's average baseline
-      const benchmarkVolume = (currentTick as any).avgVolume20d || 2000000;
+      // Dynamic relative volume ratio against symbol's true 20-day historical average from symbol_stats
+      const benchmarkVolume = currentTick.avgVolume20d || currentTick.volume || 1000000;
       const volumeRatio = currentTick.volume && benchmarkVolume > 0
         ? Math.min(3.5, Math.max(0.4, Number((currentTick.volume / benchmarkVolume).toFixed(2))))
         : 1.0;
@@ -90,7 +89,9 @@ export class DigestService {
 
       const minutesAgo = Math.max(1, Math.round((now - since.getTime()) / (60 * 1000)));
 
-      const sparkline = marketSimulator.getSparkline(symbol, currentTick.ltp, previousPrice);
+      // True historical price trajectory strictly queried from persisted TimescaleDB ticks
+      const recentPrices = await tickRepository.getRecentPrices(symbol, 20);
+      const sparkline = recentPrices.length >= 2 ? recentPrices : [previousPrice, currentTick.ltp];
       const structure = calculateMarketStructure(
         symbol,
         currentTick.ltp,

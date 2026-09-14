@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, prototype ]
+  pull_request:
+    branches: [ main, prototype ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Backend Tests & Build
+        run: |
+          cd backend
+          npm ci
+          npm test
+          npm run build
+      - name: Frontend Build
+        run: |
+          cd frontend
+          npm ci
+          npm run build

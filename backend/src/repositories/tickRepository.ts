@@ -23,10 +23,13 @@ export class TickRepository {
 
   async getLatestTick(symbol: string): Promise<Tick | null> {
     const sql = `
-      SELECT timestamp, symbol, ltp::float, volume::bigint, bid::float, ask::float, high::float, low::float, open::float, close::float
-      FROM market_ticks
-      WHERE symbol = $1
-      ORDER BY timestamp DESC
+      SELECT m.timestamp, m.symbol, m.ltp::float, m.volume::bigint,
+             COALESCE(s.avg_volume_20d, m.volume)::bigint as "avgVolume20d",
+             m.bid::float, m.ask::float, m.high::float, m.low::float, m.open::float, m.close::float
+      FROM market_ticks m
+      LEFT JOIN symbol_stats s ON s.symbol = m.symbol
+      WHERE m.symbol = $1
+      ORDER BY m.timestamp DESC
       LIMIT 1
     `;
     const rows = await query<Tick>(sql, [symbol]);
@@ -35,39 +38,56 @@ export class TickRepository {
 
   async getTickAtOrBefore(symbol: string, timestamp: Date): Promise<Tick | null> {
     const sql = `
-      SELECT timestamp, symbol, ltp::float, volume::bigint, bid::float, ask::float, high::float, low::float, open::float, close::float
-      FROM market_ticks
-      WHERE symbol = $1 AND timestamp <= $2
-      ORDER BY timestamp DESC
+      SELECT m.timestamp, m.symbol, m.ltp::float, m.volume::bigint,
+             COALESCE(s.avg_volume_20d, m.volume)::bigint as "avgVolume20d",
+             m.bid::float, m.ask::float, m.high::float, m.low::float, m.open::float, m.close::float
+      FROM market_ticks m
+      LEFT JOIN symbol_stats s ON s.symbol = m.symbol
+      WHERE m.symbol = $1 AND m.timestamp <= $2
+      ORDER BY m.timestamp DESC
       LIMIT 1
     `;
     const rows = await query<Tick>(sql, [symbol, timestamp]);
     return rows.length > 0 ? rows[0] : null;
   }
 
+  async getRecentPrices(symbol: string, limit: number = 20): Promise<number[]> {
+    const sql = `
+      SELECT ltp::float as ltp
+      FROM market_ticks
+      WHERE symbol = $1
+      ORDER BY timestamp DESC
+      LIMIT $2
+    `;
+    const rows = await query<{ ltp: number }>(sql, [symbol, limit]);
+    if (rows.length === 0) return [];
+    return rows.map((r) => r.ltp).reverse();
+  }
+
   async getSnapshot(symbols: string[]): Promise<MarketSnapshot[]> {
     if (symbols.length === 0) return [];
     
-    // Hypertable aggregate query
+    // Hypertable aggregate query with real 20-day historical average volume from symbol_stats
     const sql = `
-      SELECT DISTINCT ON (symbol)
-        symbol,
-        ltp::float as ltp,
-        (ltp - close)::float as change,
-        CASE WHEN close > 0 THEN ((ltp - close) / close * 100)::float ELSE 0 END as "changePercent",
-        volume::bigint as volume,
-        (volume * 0.85)::bigint as "avgVolume20d",
-        high::float as high,
-        low::float as low,
-        open::float as open,
-        close::float as close,
-        bid::float as bid,
-        ask::float as ask,
-        (high - low)::float as atr20,
-        timestamp as "lastUpdated"
-      FROM market_ticks
-      WHERE symbol = ANY($1)
-      ORDER BY symbol, timestamp DESC
+      SELECT DISTINCT ON (m.symbol)
+        m.symbol,
+        m.ltp::float as ltp,
+        (m.ltp - m.close)::float as change,
+        CASE WHEN m.close > 0 THEN ((m.ltp - m.close) / m.close * 100)::float ELSE 0 END as "changePercent",
+        m.volume::bigint as volume,
+        COALESCE(s.avg_volume_20d, m.volume)::bigint as "avgVolume20d",
+        m.high::float as high,
+        m.low::float as low,
+        m.open::float as open,
+        m.close::float as close,
+        m.bid::float as bid,
+        m.ask::float as ask,
+        (m.high - m.low)::float as atr20,
+        m.timestamp as "lastUpdated"
+      FROM market_ticks m
+      LEFT JOIN symbol_stats s ON s.symbol = m.symbol
+      WHERE m.symbol = ANY($1)
+      ORDER BY m.symbol, m.timestamp DESC
     `;
     const rows = await query<any>(sql, [symbols]);
     return rows.map((r) => ({

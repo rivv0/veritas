@@ -29,6 +29,7 @@ export interface Tick {
   symbol: string;
   ltp: number;
   volume: number;
+  avgVolume20d?: number;
   bid?: number;
   ask?: number;
   high?: number;

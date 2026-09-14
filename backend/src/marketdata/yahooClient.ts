@@ -22,6 +22,7 @@ const USER_AGENTS = [
 export class YahooClient {
   private cache: Map<string, CacheEntry> = new Map();
   private cacheTTLMs = 60000; // 60 seconds cache to prevent spamming and rate-limiting
+  private avgVolCache: Map<string, { value: number; expiresAt: number }> = new Map();
   private throttleQueue: Promise<void> = Promise.resolve();
   private minIntervalMs = 180; // Pacing between Yahoo calls to completely avoid 429 rate limits
   private uaIndex = 0;
@@ -134,6 +135,65 @@ export class YahooClient {
       }
     }
 
+    return null;
+  }
+
+  async fetch20DayAvgVolume(symbol: string): Promise<number | null> {
+    const cleanSym = symbol.trim().toUpperCase();
+    const cached = this.avgVolCache.get(cleanSym);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value;
+    }
+
+    const SYMBOL_ALIASES: Record<string, string[]> = {
+      GROWW: ['GROWW.NS', 'GROWW.BO', 'GROWW'],
+      TATAMOTORS: ['TMCV.NS', 'TMPV.NS', 'TATAMOTORS.NS'],
+      ZOMATO: ['ETERNAL.NS', 'ZOMATO.NS'],
+    };
+
+    const candidates = SYMBOL_ALIASES[cleanSym] || (cleanSym.includes('.')
+      ? [cleanSym]
+      : [`${cleanSym}.NS`, cleanSym]);
+
+    for (const candidate of candidates) {
+      for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+        try {
+          await this.throttle();
+          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
+            candidate
+          )}?interval=1d&range=1mo`;
+
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': this.getNextUserAgent(),
+              Accept: 'application/json',
+            },
+            signal: AbortSignal.timeout(8000),
+          });
+
+          if (!response.ok) continue;
+
+          const json: any = await response.json();
+          const result = json?.chart?.result?.[0];
+          if (!result) continue;
+
+          const rawVols: (number | null)[] = result.indicators?.quote?.[0]?.volume || [];
+          const validVols = rawVols.filter((v): v is number => typeof v === 'number' && !isNaN(v) && v > 0);
+
+          if (validVols.length > 0) {
+            const recent20 = validVols.slice(-20);
+            const avgVol = Math.round(recent20.reduce((sum, v) => sum + v, 0) / recent20.length);
+            this.avgVolCache.set(cleanSym, {
+              value: avgVol,
+              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            });
+            return avgVol;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+    }
     return null;
   }
 
