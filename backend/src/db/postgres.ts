@@ -80,12 +80,22 @@ const memoryStore = {
     { id: 'wi-33', watchlist_id: 'wl-growth', symbol: 'MSFT', sort_order: 8, added_at: new Date() },
   ],
   market_ticks: [
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'RELIANCE', ltp: 2850.50, volume: 1500000, high: 2870, low: 2840, open: 2845, close: 2840, bid: 2850, ask: 2851 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TCS', ltp: 4120.00, volume: 800000, high: 4150, low: 4100, open: 4105, close: 4100, bid: 4119, ask: 4121 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'INFY', ltp: 1820.75, volume: 1200000, high: 1840, low: 1810, open: 1815, close: 1810, bid: 1820, ask: 1821 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'HDFCBANK', ltp: 1650.30, volume: 2000000, high: 1665, low: 1640, open: 1642, close: 1642, bid: 1650, ask: 1651 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ICICIBANK', ltp: 1210.00, volume: 1800000, high: 1225, low: 1200, open: 1202, close: 1202, bid: 1209, ask: 1211 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'WIT', ltp: 480.20, volume: 500000, high: 485, low: 478, open: 479, close: 479, bid: 480, ask: 481 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'RELIANCE', ltp: 1257.50, volume: 8777736, high: 1267.40, low: 1253.00, open: 1274.00, close: 1274.00, bid: 1256.85, ask: 1258.15 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TCS', ltp: 4120.00, volume: 1850000, high: 4165.00, low: 4108.00, open: 4155.00, close: 4155.00, bid: 4118.00, ask: 4122.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'INFY', ltp: 1820.75, volume: 4200000, high: 1850.00, low: 1812.00, open: 1845.00, close: 1845.00, bid: 1819.80, ask: 1821.70 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'HDFCBANK', ltp: 1650.30, volume: 12500000, high: 1660.00, low: 1638.00, open: 1642.00, close: 1642.00, bid: 1649.50, ask: 1651.10 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ICICIBANK', ltp: 1210.00, volume: 8900000, high: 1224.00, low: 1205.00, open: 1218.00, close: 1218.00, bid: 1209.40, ask: 1210.60 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SBIN', ltp: 815.00, volume: 14200000, high: 822.00, low: 808.00, open: 810.00, close: 810.00, bid: 814.60, ask: 815.40 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BHARTIARTL', ltp: 1840.00, volume: 3800000, high: 1862.00, low: 1832.00, open: 1855.00, close: 1855.00, bid: 1839.00, ask: 1841.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ITC', ltp: 480.00, volume: 11000000, high: 488.00, low: 477.00, open: 485.00, close: 485.00, bid: 479.75, ask: 480.25 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TATAMOTORS', ltp: 980.00, volume: 9400000, high: 1002.00, low: 974.00, open: 995.00, close: 995.00, bid: 979.50, ask: 980.50 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'LT', ltp: 3650.00, volume: 2100000, high: 3705.00, low: 3635.00, open: 3690.00, close: 3690.00, bid: 3648.00, ask: 3652.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BAJFINANCE', ltp: 7100.00, volume: 1650000, high: 7190.00, low: 7065.00, open: 7150.00, close: 7150.00, bid: 7096.00, ask: 7104.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'MARUTI', ltp: 12400.00, volume: 620000, high: 12520.00, low: 12340.00, open: 12450.00, close: 12450.00, bid: 12390.00, ask: 12410.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SUNPHARMA', ltp: 1750.00, volume: 2900000, high: 1762.00, low: 1730.00, open: 1735.00, close: 1735.00, bid: 1749.00, ask: 1751.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TITAN', ltp: 3600.00, volume: 1400000, high: 3655.00, low: 3585.00, open: 3640.00, close: 3640.00, bid: 3598.00, ask: 3602.00 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'AXISBANK', ltp: 1180.00, volume: 7300000, high: 1192.00, low: 1170.00, open: 1175.00, close: 1175.00, bid: 1179.40, ask: 1180.60 },
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'WIT', ltp: 480.20, volume: 1500000, high: 488.00, low: 478.00, open: 485.00, close: 485.00, bid: 480.00, ask: 481.00 },
   ] as any[],
   signals: [] as any[],
   user_sessions: [
@@ -394,6 +404,80 @@ export async function initPostgresSchema() {
             last_watchlist_id VARCHAR(64),
             PRIMARY KEY (user_id, device_fp)
         );
+
+        -- Seed Default User
+        INSERT INTO users (id, email, name) VALUES 
+        ('demo-user', 'trader@groww.in', 'Pro Trader')
+        ON CONFLICT (id) DO NOTHING;
+
+        -- Seed Default Watchlists
+        INSERT INTO watchlists (id, user_id, name, is_default, sort_order) VALUES
+        ('wl-core', 'demo-user', 'Nifty 50 Core', TRUE, 1),
+        ('wl-tech', 'demo-user', 'IT & Banking Giants', FALSE, 2),
+        ('wl-growth', 'demo-user', 'High Growth & Tech', FALSE, 3)
+        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order;
+
+        -- Seed Nifty 50 Core Items
+        INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
+        ('wi-1', 'wl-core', 'RELIANCE', 1),
+        ('wi-2', 'wl-core', 'TCS', 2),
+        ('wi-3', 'wl-core', 'INFY', 3),
+        ('wi-4', 'wl-core', 'HDFCBANK', 4),
+        ('wi-5', 'wl-core', 'ICICIBANK', 5),
+        ('wi-6', 'wl-core', 'SBIN', 6),
+        ('wi-7', 'wl-core', 'BHARTIARTL', 7),
+        ('wi-8', 'wl-core', 'ITC', 8),
+        ('wi-9', 'wl-core', 'TATAMOTORS', 9),
+        ('wi-10', 'wl-core', 'LT', 10),
+        ('wi-11', 'wl-core', 'BAJFINANCE', 11),
+        ('wi-12', 'wl-core', 'MARUTI', 12),
+        ('wi-13', 'wl-core', 'SUNPHARMA', 13),
+        ('wi-14', 'wl-core', 'TITAN', 14),
+        ('wi-15', 'wl-core', 'AXISBANK', 15),
+        -- IT & Banking Giants Items
+        ('wi-16', 'wl-tech', 'TCS', 1),
+        ('wi-17', 'wl-tech', 'INFY', 2),
+        ('wi-18', 'wl-tech', 'WIPRO', 3),
+        ('wi-19', 'wl-tech', 'HCLTECH', 4),
+        ('wi-20', 'wl-tech', 'HDFCBANK', 5),
+        ('wi-21', 'wl-tech', 'ICICIBANK', 6),
+        ('wi-22', 'wl-tech', 'SBIN', 7),
+        ('wi-23', 'wl-tech', 'KOTAKBANK', 8),
+        ('wi-24', 'wl-tech', 'AXISBANK', 9),
+        ('wi-25', 'wl-tech', 'WIT', 10),
+        -- High Growth & Tech Items
+        ('wi-26', 'wl-growth', 'ZOMATO', 1),
+        ('wi-27', 'wl-growth', 'PAYTM', 2),
+        ('wi-28', 'wl-growth', 'JIOFIN', 3),
+        ('wi-29', 'wl-growth', 'TATAMOTORS', 4),
+        ('wi-30', 'wl-growth', 'NVDA', 5),
+        ('wi-31', 'wl-growth', 'AAPL', 6),
+        ('wi-32', 'wl-growth', 'TSLA', 7),
+        ('wi-33', 'wl-growth', 'MSFT', 8)
+        ON CONFLICT (watchlist_id, symbol) DO NOTHING;
+
+        -- Seed Real Market Ticks (So database is never empty or dummy)
+        INSERT INTO market_ticks (timestamp, symbol, ltp, volume, bid, ask, high, low, open, close) VALUES
+        (NOW(), 'RELIANCE', 1257.50, 8777736, 1256.85, 1258.15, 1267.40, 1253.00, 1274.00, 1274.00),
+        (NOW(), 'TCS', 4120.00, 1850000, 4118.00, 4122.00, 4165.00, 4108.00, 4155.00, 4155.00),
+        (NOW(), 'INFY', 1820.75, 4200000, 1819.80, 1821.70, 1850.00, 1812.00, 1845.00, 1845.00),
+        (NOW(), 'HDFCBANK', 1650.30, 12500000, 1649.50, 1651.10, 1660.00, 1638.00, 1642.00, 1642.00),
+        (NOW(), 'ICICIBANK', 1210.00, 8900000, 1209.40, 1210.60, 1224.00, 1205.00, 1218.00, 1218.00),
+        (NOW(), 'SBIN', 815.00, 14200000, 814.60, 815.40, 822.00, 808.00, 810.00, 810.00),
+        (NOW(), 'BHARTIARTL', 1840.00, 3800000, 1839.00, 1841.00, 1862.00, 1832.00, 1855.00, 1855.00),
+        (NOW(), 'ITC', 480.00, 11000000, 479.75, 480.25, 488.00, 477.00, 485.00, 485.00),
+        (NOW(), 'TATAMOTORS', 980.00, 9400000, 979.50, 980.50, 1002.00, 974.00, 995.00, 995.00),
+        (NOW(), 'LT', 3650.00, 2100000, 3648.00, 3652.00, 3705.00, 3635.00, 3690.00, 3690.00),
+        (NOW(), 'BAJFINANCE', 7100.00, 1650000, 7096.00, 7104.00, 7190.00, 7065.00, 7150.00, 7150.00),
+        (NOW(), 'MARUTI', 12400.00, 620000, 12390.00, 12410.00, 12520.00, 12340.00, 12450.00, 12450.00),
+        (NOW(), 'SUNPHARMA', 1750.00, 2900000, 1749.00, 1751.00, 1762.00, 1730.00, 1735.00, 1735.00),
+        (NOW(), 'TITAN', 3600.00, 1400000, 3598.00, 3602.00, 3655.00, 3585.00, 3640.00, 3640.00),
+        (NOW(), 'AXISBANK', 1180.00, 7300000, 1179.40, 1180.60, 1192.00, 1170.00, 1175.00, 1175.00);
+
+        -- Seed Default Session
+        INSERT INTO user_sessions (user_id, device_fp, last_seen_at, last_watchlist_id) VALUES
+        ('demo-user', 'web-default', NOW() - INTERVAL '35 minutes', 'wl-core')
+        ON CONFLICT (user_id, device_fp) DO UPDATE SET last_seen_at = NOW() - INTERVAL '35 minutes';
       `);
       console.log('[PostgreSQL] Connected successfully to remote database & schema initialized!');
       useInMemory = false;

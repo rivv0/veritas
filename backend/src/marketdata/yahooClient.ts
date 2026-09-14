@@ -13,7 +13,7 @@ interface CacheEntry {
 
 export class YahooClient {
   private cache: Map<string, CacheEntry> = new Map();
-  private cacheTTLMs = 8000; // 8 seconds cache to prevent spamming
+  private cacheTTLMs = 60000; // 60 seconds cache to prevent spamming and rate-limiting
 
   async fetchQuote(symbol: string): Promise<LiveStockData | null> {
     const cleanSym = symbol.trim().toUpperCase();
@@ -25,22 +25,23 @@ export class YahooClient {
     // Try primary symbol (append .NS if no suffix), then fallback to raw symbol
     const candidates = cleanSym.includes('.')
       ? [cleanSym]
-      : [`${cleanSym}.NS`, cleanSym, `${cleanSym}.BO`];
+      : [`${cleanSym}.NS`, cleanSym];
 
     for (const candidate of candidates) {
-      try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-          candidate
-        )}?interval=1m&range=1d`;
-        
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Accept: 'application/json',
-          },
-          signal: AbortSignal.timeout(3500),
-        });
+      for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+        try {
+          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
+            candidate
+          )}?interval=1m&range=1d`;
+          
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              Accept: 'application/json',
+            },
+            signal: AbortSignal.timeout(8000),
+          });
 
         if (!response.ok) continue;
 
@@ -96,9 +97,10 @@ export class YahooClient {
         });
 
         return liveData;
-      } catch (err) {
-        // Try next candidate
-        continue;
+        } catch (err) {
+          // Try next host or candidate
+          continue;
+        }
       }
     }
 

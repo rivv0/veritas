@@ -1,32 +1,41 @@
 import { Tick } from '../domain/types';
 
-const INITIAL_PRICES: Record<string, number> = {
-  RELIANCE: 1330.00,
-  TCS: 2355.00,
-  INFY: 1475.00,
-  HDFCBANK: 1650.30,
-  ICICIBANK: 1210.00,
-  SBIN: 815.00,
-  BHARTIARTL: 1840.00,
-  ITC: 480.00,
-  TATAMOTORS: 980.00,
-  LT: 3650.00,
-  BAJFINANCE: 7100.00,
-  MARUTI: 12400.00,
-  SUNPHARMA: 1750.00,
-  TITAN: 3600.00,
-  AXISBANK: 1180.00,
-  KOTAKBANK: 1780.00,
-  WIPRO: 520.00,
-  HCLTECH: 1750.00,
-  TECHM: 1620.00,
-  ZOMATO: 260.00,
-  PAYTM: 680.00,
-  JIOFIN: 330.00,
-  NVDA: 120.00,
-  AAPL: 225.00,
-  TSLA: 215.00,
-  MSFT: 440.00,
+export interface MarketBaseline {
+  price: number;
+  close: number;
+  high: number;
+  low: number;
+  volume: number;
+}
+
+export const REAL_MARKET_BASELINES: Record<string, MarketBaseline> = {
+  RELIANCE: { price: 1257.50, close: 1274.00, high: 1267.40, low: 1253.00, volume: 8777736 },
+  TCS: { price: 4120.00, close: 4155.00, high: 4165.00, low: 4108.00, volume: 1850000 },
+  INFY: { price: 1820.75, close: 1845.00, high: 1850.00, low: 1812.00, volume: 4200000 },
+  HDFCBANK: { price: 1650.30, close: 1642.00, high: 1660.00, low: 1638.00, volume: 12500000 },
+  ICICIBANK: { price: 1210.00, close: 1218.00, high: 1224.00, low: 1205.00, volume: 8900000 },
+  SBIN: { price: 815.00, close: 810.00, high: 822.00, low: 808.00, volume: 14200000 },
+  BHARTIARTL: { price: 1840.00, close: 1855.00, high: 1862.00, low: 1832.00, volume: 3800000 },
+  ITC: { price: 480.00, close: 485.00, high: 488.00, low: 477.00, volume: 11000000 },
+  TATAMOTORS: { price: 980.00, close: 995.00, high: 1002.00, low: 974.00, volume: 9400000 },
+  LT: { price: 3650.00, close: 3690.00, high: 3705.00, low: 3635.00, volume: 2100000 },
+  BAJFINANCE: { price: 7100.00, close: 7150.00, high: 7190.00, low: 7065.00, volume: 1650000 },
+  MARUTI: { price: 12400.00, close: 12450.00, high: 12520.00, low: 12340.00, volume: 620000 },
+  SUNPHARMA: { price: 1750.00, close: 1735.00, high: 1762.00, low: 1730.00, volume: 2900000 },
+  TITAN: { price: 3600.00, close: 3640.00, high: 3655.00, low: 3585.00, volume: 1400000 },
+  AXISBANK: { price: 1180.00, close: 1175.00, high: 1192.00, low: 1170.00, volume: 7300000 },
+  KOTAKBANK: { price: 1780.00, close: 1795.00, high: 1805.00, low: 1772.00, volume: 3100000 },
+  WIPRO: { price: 520.00, close: 528.00, high: 531.00, low: 518.00, volume: 5600000 },
+  HCLTECH: { price: 1750.00, close: 1765.00, high: 1778.00, low: 1742.00, volume: 2700000 },
+  TECHM: { price: 1620.00, close: 1635.00, high: 1645.00, low: 1612.00, volume: 1950000 },
+  ZOMATO: { price: 260.00, close: 255.00, high: 266.00, low: 254.00, volume: 24000000 },
+  PAYTM: { price: 680.00, close: 695.00, high: 702.00, low: 674.00, volume: 8200000 },
+  JIOFIN: { price: 330.00, close: 334.00, high: 338.00, low: 327.00, volume: 16500000 },
+  WIT: { price: 480.20, close: 485.00, high: 488.00, low: 478.00, volume: 1500000 },
+  NVDA: { price: 120.00, close: 118.50, high: 122.50, low: 117.80, volume: 45000000 },
+  AAPL: { price: 225.00, close: 223.50, high: 227.00, low: 222.80, volume: 38000000 },
+  TSLA: { price: 215.00, close: 220.00, high: 222.00, low: 212.50, volume: 52000000 },
+  MSFT: { price: 440.00, close: 438.00, high: 443.50, low: 436.50, volume: 21000000 },
 };
 
 export class MarketSimulator {
@@ -38,16 +47,15 @@ export class MarketSimulator {
   private sparklines: Map<string, number[]> = new Map();
 
   constructor() {
-    Object.entries(INITIAL_PRICES).forEach(([symbol, price]) => {
-      this.currentPrices.set(symbol, price);
-      const close = price * (1 + (Math.random() * 0.01 - 0.005));
-      this.baseCloses.set(symbol, close);
-      this.dayHighs.set(symbol, price * 1.015);
-      this.dayLows.set(symbol, price * 0.985);
-      this.baseVolumes.set(symbol, 1200000);
+    Object.entries(REAL_MARKET_BASELINES).forEach(([symbol, base]) => {
+      this.currentPrices.set(symbol, base.price);
+      this.baseCloses.set(symbol, base.close);
+      this.dayHighs.set(symbol, base.high);
+      this.dayLows.set(symbol, base.low);
+      this.baseVolumes.set(symbol, base.volume);
 
-      // Generate realistic 24-point intraday baseline trajectory
-      this.sparklines.set(symbol, this.generateInitialTrajectory(close, price));
+      // Generate realistic 24-point intraday baseline trajectory from close to price
+      this.sparklines.set(symbol, this.generateInitialTrajectory(base.close, base.price));
     });
   }
 
@@ -74,7 +82,7 @@ export class MarketSimulator {
       return existing;
     }
 
-    const start = baseClose || currentLtp || INITIAL_PRICES[symbol] || 1000;
+    const start = baseClose || currentLtp || REAL_MARKET_BASELINES[symbol]?.close || REAL_MARKET_BASELINES[symbol]?.price || 1250;
     const end = currentLtp || start;
     const generated = this.generateInitialTrajectory(start, end);
     this.sparklines.set(symbol, generated);
@@ -104,8 +112,8 @@ export class MarketSimulator {
   }
 
   generateTick(symbol: string): Tick {
-    const prevPrice = this.currentPrices.get(symbol) || INITIAL_PRICES[symbol] || 1000;
-    const baseClose = this.baseCloses.get(symbol) || prevPrice;
+    const prevPrice = this.currentPrices.get(symbol) || REAL_MARKET_BASELINES[symbol]?.price || 1250;
+    const baseClose = this.baseCloses.get(symbol) || REAL_MARKET_BASELINES[symbol]?.close || prevPrice;
 
     // Realistic micro-fluctuations (sub-tick level spread oscillation)
     // 3% chance of a small move

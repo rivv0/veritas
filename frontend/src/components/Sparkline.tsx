@@ -71,13 +71,22 @@ export function Sparkline({
   }
 
   const strokeColor = useMemo(() => {
-    if (isDeadCatBounce) return '#f59e0b';
-    if (sentiment === 'BEARISH') return '#f87171';
-    if (sentiment === 'BULLISH') return '#34d399';
-    if (isPositive === false) return '#f87171';
-    if (isPositive === true) return '#34d399';
-    if (data && data.length >= 2 && data[data.length - 1] < data[0]) return '#f87171';
-    return '#34d399';
+    if (isDeadCatBounce) return '#f59e0b'; // Amber warning
+    if (sentiment === 'BEARISH') return '#f87171'; // Red
+    if (isPositive === false) return '#f87171'; // Red
+
+    if (data && data.length >= 2) {
+      const first = data[0];
+      const last = data[data.length - 1];
+      if (last < first - 0.001) return '#f87171'; // Red downward slope
+      if (last > first + 0.001) return '#34d399'; // Green upward slope
+    }
+
+    if (sentiment === 'BULLISH') return '#34d399'; // Green
+    if (isPositive === true) return '#34d399'; // Green
+
+    // Flat / Unchanged / Neutral is ZINC GRAY, NEVER GREEN!
+    return '#71717a';
   }, [isDeadCatBounce, sentiment, isPositive, data]);
 
   return (

@@ -416,6 +416,8 @@ export function WatchlistTable({
                   ? ((tick.ltp - tick.close) / tick.close) * 100
                   : fallbackChange;
 
+              const isRowBearish = struct?.sentiment === 'BEARISH' || struct?.emaState === 'BELOW_EMA' || liveChange < -0.001;
+
               return (
                 <tr
                   key={symbol}
@@ -502,8 +504,8 @@ export function WatchlistTable({
                     >
                       <Sparkline
                         data={currentSparkline}
-                        isPositive={liveChange > 0.001}
-                        sentiment={struct?.sentiment}
+                        isPositive={!isRowBearish && liveChange > 0.001}
+                        sentiment={isRowBearish ? 'BEARISH' : struct?.sentiment}
                         isDeadCatBounce={struct?.isDeadCatBounce}
                         width={90}
                         height={24}
