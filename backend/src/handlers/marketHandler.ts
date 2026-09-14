@@ -9,7 +9,8 @@ import { newsService } from '../services/newsService';
 import { calculateMarketStructure } from '../signal/marketStructure';
 
 const STOCK_DIRECTORY = [
-  // Nifty 50 / Major Indian Stocks
+  // Honorary & Nifty 50 Core Indian Stocks
+  { symbol: 'GROWW', name: 'Groww (Billionbrains Garage Ventures)', exchange: 'NSE', sector: 'Fintech' },
   { symbol: 'RELIANCE', name: 'Reliance Industries Ltd.', exchange: 'NSE', sector: 'Energy' },
   { symbol: 'TCS', name: 'Tata Consultancy Services Ltd.', exchange: 'NSE', sector: 'Technology' },
   { symbol: 'INFY', name: 'Infosys Limited', exchange: 'NSE', sector: 'Technology' },

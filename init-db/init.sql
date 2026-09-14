@@ -95,8 +95,9 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_
 -- Clear previous items for seeded watchlists to avoid duplicate keys on re-run
 DELETE FROM watchlist_items WHERE watchlist_id IN ('wl-core', 'wl-tech', 'wl-growth');
 
--- Nifty 50 Core Items (15 Top Indian Stocks)
+-- Nifty 50 Core Items (16 Stocks with Honorary GROWW)
 INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
+('wi-0', 'wl-core', 'GROWW', 0),
 ('wi-1', 'wl-core', 'RELIANCE', 1),
 ('wi-2', 'wl-core', 'TCS', 2),
 ('wi-3', 'wl-core', 'INFY', 3),
@@ -126,8 +127,9 @@ INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
 ('wi-24', 'wl-tech', 'AXISBANK', 9),
 ('wi-25', 'wl-tech', 'WIT', 10);
 
--- High Growth & Tech Items (8 Stocks)
+-- High Growth & Tech Items (9 Stocks with Honorary GROWW)
 INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
+('wi-growth-0', 'wl-growth', 'GROWW', 0),
 ('wi-26', 'wl-growth', 'ZOMATO', 1),
 ('wi-27', 'wl-growth', 'PAYTM', 2),
 ('wi-28', 'wl-growth', 'JIOFIN', 3),

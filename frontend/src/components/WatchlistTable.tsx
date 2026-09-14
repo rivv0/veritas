@@ -473,6 +473,13 @@ export function WatchlistTable({
                         </span>
                       )}
 
+                      {/* Honorary Badge for GROWW */}
+                      {symbol === 'GROWW' && (
+                        <span className="px-1.5 py-0.2 rounded-none text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 uppercase shadow-sm">
+                          ★ HONORARY
+                        </span>
+                      )}
+
                       {/* Event Suffix */}
                       {struct?.eventSuffix && (
                         <span className="px-1 py-0.2 rounded-none text-[8px] font-mono text-zinc-400 bg-zinc-900/80 border border-zinc-800 uppercase">
@@ -480,8 +487,11 @@ export function WatchlistTable({
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-zinc-500 font-mono">
-                      {symbol.includes('.') ? symbol.split('.')[1] : 'NSE'} • EQ
+                    <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5">
+                      <span>{symbol.includes('.') ? symbol.split('.')[1] : 'NSE'} • EQ</span>
+                      {symbol === 'GROWW' && (
+                        <span className="text-zinc-400 font-medium tracking-tight">· Billionbrains Garage</span>
+                      )}
                     </div>
                   </td>
 

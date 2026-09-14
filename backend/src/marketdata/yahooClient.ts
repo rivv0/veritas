@@ -11,11 +11,26 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+];
+
 export class YahooClient {
   private cache: Map<string, CacheEntry> = new Map();
   private cacheTTLMs = 60000; // 60 seconds cache to prevent spamming and rate-limiting
   private throttleQueue: Promise<void> = Promise.resolve();
   private minIntervalMs = 180; // Pacing between Yahoo calls to completely avoid 429 rate limits
+  private uaIndex = 0;
+
+  private getNextUserAgent(): string {
+    const ua = USER_AGENTS[this.uaIndex % USER_AGENTS.length];
+    this.uaIndex++;
+    return ua;
+  }
 
   private throttle(): Promise<void> {
     this.throttleQueue = this.throttleQueue.then(
@@ -32,6 +47,7 @@ export class YahooClient {
     }
 
     const SYMBOL_ALIASES: Record<string, string[]> = {
+      GROWW: ['GROWW.NS', 'GROWW.BO', 'GROWW'],
       TATAMOTORS: ['TMCV.NS', 'TMPV.NS', 'TATAMOTORS.NS'],
       ZOMATO: ['ETERNAL.NS', 'ZOMATO.NS'],
     };
@@ -51,8 +67,7 @@ export class YahooClient {
           
           const response = await fetch(url, {
             headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'User-Agent': this.getNextUserAgent(),
               Accept: 'application/json',
             },
             signal: AbortSignal.timeout(8000),

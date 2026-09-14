@@ -18,8 +18,9 @@ export const config = {
   },
   market: {
     tickIntervalMs: 2000,
-    symbols: ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'WIT'],
+    symbols: ['GROWW', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'WIT'],
     sectorEtfMap: {
+      'GROWW': 'NIFTYFIN',
       'TCS': 'NIFTYIT',
       'INFY': 'NIFTYIT',
       'WIT': 'NIFTYIT',

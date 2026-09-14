@@ -26,7 +26,7 @@ export function StockChartModal({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [liveHistory, setLiveHistory] = useState<number[]>([]);
 
-  const ltp = tick?.ltp ?? snapshot?.ltp ?? 1000;
+  const ltp = tick?.ltp ?? snapshot?.ltp ?? (symbol === 'GROWW' ? 200 : 100);
   const baseClose = snapshot?.close ?? tick?.close ?? ltp;
   const change =
     tick?.change !== undefined
@@ -169,6 +169,11 @@ export function StockChartModal({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xl font-bold font-mono text-white tracking-tight">{symbol}</span>
+              {symbol === 'GROWW' && (
+                <span className="px-1.5 py-0.5 rounded-none text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 uppercase shadow-sm">
+                  ★ HONORARY
+                </span>
+              )}
               {struct?.tier && (
                 <span className="px-1.5 py-0.5 rounded-none text-[9px] font-mono font-bold bg-zinc-900 text-zinc-300 border border-zinc-700 uppercase">
                   {struct.tier}
@@ -192,7 +197,9 @@ export function StockChartModal({
               )}
             </div>
             <p className="text-xs text-zinc-400 font-mono mt-0.5">
-              VERITAS REAL-TIME CHART & STRUCTURAL TELEMETRY
+              {symbol === 'GROWW'
+                ? 'Billionbrains Garage Ventures Limited (NSE: GROWW) • Real-Feed Telemetry'
+                : 'VERITAS REAL-TIME CHART & STRUCTURAL TELEMETRY'}
             </p>
           </div>
 

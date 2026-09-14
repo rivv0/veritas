@@ -42,7 +42,8 @@ const memoryStore = {
     { id: 'wl-growth', user_id: 'demo-user', name: 'High Growth & Tech', sort_order: 3, is_default: false, created_at: new Date(), updated_at: new Date() },
   ],
   watchlist_items: [
-    // Nifty 50 Core (15 stocks)
+    // Nifty 50 Core (16 stocks with Honorary GROWW)
+    { id: 'wi-0', watchlist_id: 'wl-core', symbol: 'GROWW', sort_order: 0, added_at: new Date() },
     { id: 'wi-1', watchlist_id: 'wl-core', symbol: 'RELIANCE', sort_order: 1, added_at: new Date() },
     { id: 'wi-2', watchlist_id: 'wl-core', symbol: 'TCS', sort_order: 2, added_at: new Date() },
     { id: 'wi-3', watchlist_id: 'wl-core', symbol: 'INFY', sort_order: 3, added_at: new Date() },
@@ -69,7 +70,8 @@ const memoryStore = {
     { id: 'wi-23', watchlist_id: 'wl-tech', symbol: 'KOTAKBANK', sort_order: 8, added_at: new Date() },
     { id: 'wi-24', watchlist_id: 'wl-tech', symbol: 'AXISBANK', sort_order: 9, added_at: new Date() },
     { id: 'wi-25', watchlist_id: 'wl-tech', symbol: 'WIT', sort_order: 10, added_at: new Date() },
-    // High Growth & Tech (8 stocks)
+    // High Growth & Tech (9 stocks with Honorary GROWW)
+    { id: 'wi-growth-0', watchlist_id: 'wl-growth', symbol: 'GROWW', sort_order: 0, added_at: new Date() },
     { id: 'wi-26', watchlist_id: 'wl-growth', symbol: 'ZOMATO', sort_order: 1, added_at: new Date() },
     { id: 'wi-27', watchlist_id: 'wl-growth', symbol: 'PAYTM', sort_order: 2, added_at: new Date() },
     { id: 'wi-28', watchlist_id: 'wl-growth', symbol: 'JIOFIN', sort_order: 3, added_at: new Date() },
@@ -80,6 +82,7 @@ const memoryStore = {
     { id: 'wi-33', watchlist_id: 'wl-growth', symbol: 'MSFT', sort_order: 8, added_at: new Date() },
   ],
   market_ticks: [
+    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'GROWW', ltp: 200.00, volume: 31136422, high: 200.91, low: 192.60, open: 195.84, close: 195.84, bid: 199.80, ask: 200.20 },
     { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'RELIANCE', ltp: 1257.50, volume: 8777736, high: 1267.40, low: 1253.00, open: 1274.00, close: 1274.00, bid: 1256.85, ask: 1258.15 },
     { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TCS', ltp: 2200.80, volume: 2634124, high: 2232.60, low: 2185.50, open: 2204.10, close: 2204.10, bid: 2198.50, ask: 2202.50 },
     { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'INFY', ltp: 1037.70, volume: 6168088, high: 1047.30, low: 1029.70, open: 1036.50, close: 1036.50, bid: 1036.80, ask: 1038.50 },
@@ -417,8 +420,9 @@ export async function initPostgresSchema() {
         ('wl-growth', 'demo-user', 'High Growth & Tech', FALSE, 3)
         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order;
 
-        -- Seed Nifty 50 Core Items
+        -- Seed Nifty 50 Core Items (With Honorary GROWW)
         INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
+        ('wi-0', 'wl-core', 'GROWW', 0),
         ('wi-1', 'wl-core', 'RELIANCE', 1),
         ('wi-2', 'wl-core', 'TCS', 2),
         ('wi-3', 'wl-core', 'INFY', 3),
@@ -445,7 +449,8 @@ export async function initPostgresSchema() {
         ('wi-23', 'wl-tech', 'KOTAKBANK', 8),
         ('wi-24', 'wl-tech', 'AXISBANK', 9),
         ('wi-25', 'wl-tech', 'WIT', 10),
-        -- High Growth & Tech Items
+        -- High Growth & Tech Items (With Honorary GROWW)
+        ('wi-growth-0', 'wl-growth', 'GROWW', 0),
         ('wi-26', 'wl-growth', 'ZOMATO', 1),
         ('wi-27', 'wl-growth', 'PAYTM', 2),
         ('wi-28', 'wl-growth', 'JIOFIN', 3),
@@ -458,6 +463,7 @@ export async function initPostgresSchema() {
 
         -- Seed Real Market Ticks (So database is never empty or dummy)
         INSERT INTO market_ticks (timestamp, symbol, ltp, volume, bid, ask, high, low, open, close) VALUES
+        (NOW(), 'GROWW', 200.00, 31136422, 199.80, 200.20, 200.91, 192.60, 195.84, 195.84),
         (NOW(), 'RELIANCE', 1257.50, 8777736, 1256.85, 1258.15, 1267.40, 1253.00, 1274.00, 1274.00),
         (NOW(), 'TCS', 2200.80, 2634124, 2198.50, 2202.50, 2232.60, 2185.50, 2204.10, 2204.10),
         (NOW(), 'INFY', 1037.70, 6168088, 1036.80, 1038.50, 1047.30, 1029.70, 1036.50, 1036.50),

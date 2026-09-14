@@ -9,6 +9,7 @@ export interface MarketBaseline {
 }
 
 export const REAL_MARKET_BASELINES: Record<string, MarketBaseline> = {
+  GROWW: { price: 200.00, close: 195.84, high: 200.91, low: 192.60, volume: 31136422 },
   RELIANCE: { price: 1257.50, close: 1274.00, high: 1267.40, low: 1253.00, volume: 8777736 },
   TCS: { price: 2200.80, close: 2204.10, high: 2232.60, low: 2185.50, volume: 2634124 },
   INFY: { price: 1037.70, close: 1036.50, high: 1047.30, low: 1029.70, volume: 6168088 },
