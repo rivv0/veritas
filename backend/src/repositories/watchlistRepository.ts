@@ -85,6 +85,62 @@ export class WatchlistRepository {
     const rows = await query<{ symbol: string }>(`SELECT DISTINCT symbol FROM watchlist_items`);
     return rows.map((r) => r.symbol);
   }
+
+  async seedDefaultsForUser(userId: string): Promise<Watchlist[]> {
+    // 1. Ensure user exists
+    await query(
+      `INSERT INTO users (id, email, name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+      [userId, `${userId}@veritas.local`, 'Pro Trader']
+    );
+
+    const defaultSets = [
+      {
+        name: 'Nifty 50 Core',
+        isDefault: true,
+        sortOrder: 1,
+        symbols: [
+          'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK',
+          'SBIN', 'BHARTIARTL', 'ITC', 'TATAMOTORS', 'LT',
+          'BAJFINANCE', 'MARUTI', 'SUNPHARMA', 'TITAN', 'AXISBANK'
+        ],
+      },
+      {
+        name: 'IT & Banking Giants',
+        isDefault: false,
+        sortOrder: 2,
+        symbols: [
+          'TCS', 'INFY', 'WIPRO', 'HCLTECH', 'HDFCBANK',
+          'ICICIBANK', 'SBIN', 'KOTAKBANK', 'AXISBANK', 'WIT'
+        ],
+      },
+      {
+        name: 'High Growth & Tech',
+        isDefault: false,
+        sortOrder: 3,
+        symbols: [
+          'ZOMATO', 'PAYTM', 'JIOFIN', 'TATAMOTORS',
+          'NVDA', 'AAPL', 'TSLA', 'MSFT'
+        ],
+      },
+    ];
+
+    for (const set of defaultSets) {
+      const wlId = `wl-${uuidv4().slice(0, 8)}`;
+      await query(
+        `INSERT INTO watchlists (id, user_id, name, is_default, sort_order) VALUES ($1, $2, $3, $4, $5)`,
+        [wlId, userId, set.name, set.isDefault, set.sortOrder]
+      );
+      for (let i = 0; i < set.symbols.length; i++) {
+        const itemId = `wi-${uuidv4().slice(0, 8)}`;
+        await query(
+          `INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES ($1, $2, $3, $4)`,
+          [itemId, wlId, set.symbols[i], i + 1]
+        );
+      }
+    }
+
+    return this.findByUserId(userId);
+  }
 }
 
 export const watchlistRepository = new WatchlistRepository();

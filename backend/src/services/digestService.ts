@@ -8,22 +8,12 @@ import { WatchlistDigest, DigestItem } from '../domain/types';
 
 export class DigestService {
   async generateDigest(userId: string, deviceFp: string, watchlistId?: string): Promise<WatchlistDigest> {
-    // 1. Determine realistic baseline time:
-    // If user was seen very recently (< 20 mins ago), look back 45 mins so there are genuine deltas to review
+    // 1. Honest baseline timestamp: accurately reflects the user's actual last visit
     const session = await sessionRepository.getSession(userId, deviceFp);
     const now = Date.now();
-    let since: Date;
-
-    if (session && session.lastSeenAt) {
-      const msSinceLastSeen = now - new Date(session.lastSeenAt).getTime();
-      if (msSinceLastSeen < 20 * 60 * 1000) {
-        since = new Date(now - 45 * 60 * 1000); // 45-min lookback baseline
-      } else {
-        since = new Date(session.lastSeenAt);
-      }
-    } else {
-      since = new Date(now - 45 * 60 * 1000);
-    }
+    const since = session && session.lastSeenAt
+      ? new Date(session.lastSeenAt)
+      : new Date(now - 30 * 60 * 1000);
 
     // 2. Fetch target watchlist
     const watchlists = await watchlistRepository.findByUserId(userId);
@@ -76,10 +66,11 @@ export class DigestService {
       const low = currentTick.low || (baseClose * 0.985);
       const dayRangePercent = low > 0 ? Number((((high - low) / low) * 100).toFixed(2)) : 1.5;
 
-      // Estimate volume ratio
-      const volumeRatio = currentTick.volume
-        ? Math.min(2.8, Math.max(0.7, Number((currentTick.volume / 1200000).toFixed(2))))
-        : 1.1;
+      // Dynamic relative volume ratio against symbol's average baseline
+      const benchmarkVolume = (currentTick as any).avgVolume20d || 2000000;
+      const volumeRatio = currentTick.volume && benchmarkVolume > 0
+        ? Math.min(3.5, Math.max(0.4, Number((currentTick.volume / benchmarkVolume).toFixed(2))))
+        : 1.0;
 
       const symbolSignals = signals.filter((s) => s.symbol === symbol);
       const attentionScore = computeAttentionScore(percentChange, volumeRatio, symbolSignals, dayRangePercent);

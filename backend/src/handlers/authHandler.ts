@@ -6,7 +6,8 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export function mockAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  req.userId = (req.headers['x-user-id'] as string) || 'demo-user';
-  req.deviceFp = (req.headers['x-device-fp'] as string) || 'web-default';
+  const incomingUser = (req.headers['x-user-id'] as string) || (req.headers['x-device-fp'] as string);
+  req.userId = incomingUser || 'demo-user';
+  req.deviceFp = (req.headers['x-device-fp'] as string) || req.userId || 'web-default';
   next();
 }

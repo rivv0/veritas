@@ -12,7 +12,7 @@ export function computeAttentionScore(
   const moveScore = Math.min(35, absMove * 16);
 
   // 2. Intraday Range Expansion / Volatility (up to 25 points)
-  const rangeScore = Math.min(25, Math.max(5, (dayRangePercent || 1.2) * 11));
+  const rangeScore = Math.min(25, (dayRangePercent || 0) * 11);
 
   // 3. Institutional Signals & Smart Flow (up to 45 points)
   let signalScore = 0;
@@ -36,13 +36,13 @@ export function computeAttentionScore(
 
   const cappedSignalScore = Math.min(45, signalScore);
 
-  // 4. Relative Volume Expansion (up to 20 points)
-  const volumeScore = Math.min(20, Math.max(0, (volumeRatio - 0.75) * 14));
+  // 4. Relative Volume Expansion (up to 20 points, kicks in when volume exceeds 1.0x baseline)
+  const volumeScore = Math.min(20, Math.max(0, (volumeRatio - 1.0) * 14));
 
   // 5. Total composite Attention Score
   const rawTotal = moveScore + rangeScore + cappedSignalScore + volumeScore;
 
-  // Ensure an organic, meaningful distribution (20 to 98)
-  const score = Math.min(98, Math.max(18, Math.round(rawTotal)));
+  // Honest baseline floor of 5 (quiet sessions score low, proving the algorithm discriminates)
+  const score = Math.min(98, Math.max(5, Math.round(rawTotal)));
   return score;
 }

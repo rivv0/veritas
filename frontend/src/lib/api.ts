@@ -9,9 +9,27 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'demo-user';
+  let id = localStorage.getItem('veritas_device_id');
+  if (!id) {
+    id = 'dev-' + Math.random().toString(36).slice(2, 9) + '-' + Date.now().toString(36);
+    localStorage.setItem('veritas_device_id', id);
+  }
+  return id;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const deviceId = getDeviceId();
+  return {
+    'x-user-id': deviceId,
+    'x-device-fp': deviceId,
+  };
+}
+
 export async function fetchWatchlists() {
   const res = await fetch(`${API_BASE}/api/v1/watchlists`, {
-    headers: { 'x-user-id': 'demo-user' },
+    headers: getAuthHeaders(),
   });
   return res.json();
 }
@@ -19,7 +37,7 @@ export async function fetchWatchlists() {
 export async function createWatchlist(name: string) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': 'demo-user' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ name }),
   });
   return res.json();
@@ -28,7 +46,7 @@ export async function createWatchlist(name: string) {
 export async function renameWatchlist(watchlistId: string, name: string) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': 'demo-user' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ name }),
   });
   return res.json();
@@ -37,7 +55,7 @@ export async function renameWatchlist(watchlistId: string, name: string) {
 export async function deleteWatchlist(watchlistId: string) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}`, {
     method: 'DELETE',
-    headers: { 'x-user-id': 'demo-user' },
+    headers: getAuthHeaders(),
   });
   return res.json();
 }
@@ -45,7 +63,7 @@ export async function deleteWatchlist(watchlistId: string) {
 export async function reorderWatchlistSymbols(watchlistId: string, symbols: string[]) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}/reorder`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': 'demo-user' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ symbols }),
   });
   return res.json();
@@ -54,7 +72,7 @@ export async function reorderWatchlistSymbols(watchlistId: string, symbols: stri
 export async function addSymbol(watchlistId: string, symbol: string) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}/symbols`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': 'demo-user' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ symbol }),
   });
   return res.json();
@@ -63,7 +81,7 @@ export async function addSymbol(watchlistId: string, symbol: string) {
 export async function removeSymbol(watchlistId: string, symbol: string) {
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}/symbols/${symbol}`, {
     method: 'DELETE',
-    headers: { 'x-user-id': 'demo-user' },
+    headers: getAuthHeaders(),
   });
   return res.json();
 }
@@ -71,10 +89,7 @@ export async function removeSymbol(watchlistId: string, symbol: string) {
 export async function fetchDigest(watchlistId: string, lookbackMinutes?: number) {
   const query = lookbackMinutes ? `?lookback=${lookbackMinutes}` : '';
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}/digest${query}`, {
-    headers: {
-      'x-user-id': 'demo-user',
-      'x-device-fp': 'web-default',
-    },
+    headers: getAuthHeaders(),
   });
   return res.json();
 }

@@ -3,7 +3,11 @@ import { Watchlist } from '../domain/types';
 
 export class WatchlistService {
   async getUserWatchlists(userId: string): Promise<Watchlist[]> {
-    return watchlistRepository.findByUserId(userId);
+    const existing = await watchlistRepository.findByUserId(userId);
+    if (existing.length === 0) {
+      return watchlistRepository.seedDefaultsForUser(userId);
+    }
+    return existing;
   }
 
   async createWatchlist(userId: string, name: string): Promise<Watchlist> {
