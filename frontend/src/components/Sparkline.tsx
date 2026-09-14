@@ -2,12 +2,21 @@ import React, { useId, useMemo } from 'react';
 
 interface Props {
   data?: number[];
-  isPositive: boolean;
+  isPositive?: boolean;
+  sentiment?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  isDeadCatBounce?: boolean;
   width?: number;
   height?: number;
 }
 
-export function Sparkline({ data = [], isPositive, width = 110, height = 32 }: Props) {
+export function Sparkline({
+  data = [],
+  isPositive,
+  sentiment,
+  isDeadCatBounce,
+  width = 110,
+  height = 32,
+}: Props) {
   const gradientId = useId();
 
   const chart = useMemo(() => {
@@ -61,7 +70,15 @@ export function Sparkline({ data = [], isPositive, width = 110, height = 32 }: P
     );
   }
 
-  const strokeColor = isPositive ? '#34d399' : '#f87171';
+  const strokeColor = useMemo(() => {
+    if (isDeadCatBounce) return '#f59e0b';
+    if (sentiment === 'BEARISH') return '#f87171';
+    if (sentiment === 'BULLISH') return '#34d399';
+    if (isPositive === false) return '#f87171';
+    if (isPositive === true) return '#34d399';
+    if (data && data.length >= 2 && data[data.length - 1] < data[0]) return '#f87171';
+    return '#34d399';
+  }, [isDeadCatBounce, sentiment, isPositive, data]);
 
   return (
     <svg width={width} height={height} className="overflow-visible select-none shrink-0">

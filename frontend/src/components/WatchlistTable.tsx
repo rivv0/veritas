@@ -502,7 +502,9 @@ export function WatchlistTable({
                     >
                       <Sparkline
                         data={currentSparkline}
-                        isPositive={liveChange >= 0}
+                        isPositive={liveChange > 0.001}
+                        sentiment={struct?.sentiment}
+                        isDeadCatBounce={struct?.isDeadCatBounce}
                         width={90}
                         height={24}
                       />

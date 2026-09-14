@@ -27,15 +27,26 @@ export function StockChartModal({
   const [liveHistory, setLiveHistory] = useState<number[]>([]);
 
   const ltp = tick?.ltp ?? snapshot?.ltp ?? 1000;
-  const baseClose = tick?.close ?? snapshot?.close ?? ltp;
-  const change = tick?.ltp ? tick.ltp - baseClose : snapshot?.change ?? 0;
-  const changePercent = baseClose > 0 ? (change / baseClose) * 100 : snapshot?.changePercent ?? 0;
-  const isUp = changePercent >= 0;
+  const baseClose = snapshot?.close ?? tick?.close ?? ltp;
+  const change =
+    tick?.change !== undefined
+      ? tick.change
+      : snapshot?.change !== undefined
+      ? snapshot.change
+      : ltp - baseClose;
+  const changePercent =
+    tick?.changePercent !== undefined
+      ? tick.changePercent
+      : snapshot?.changePercent !== undefined
+      ? snapshot.changePercent
+      : baseClose > 0
+      ? (change / baseClose) * 100
+      : 0;
 
+  const struct = snapshot?.structure;
   const high = tick?.high ?? snapshot?.high ?? Math.max(ltp, baseClose);
   const low = tick?.low ?? snapshot?.low ?? Math.min(ltp, baseClose);
   const volume = tick?.volume ?? snapshot?.volume ?? 0;
-  const struct = snapshot?.structure;
 
   // Initialize and append live incoming ticks to history
   useEffect(() => {
@@ -137,7 +148,17 @@ export function StockChartModal({
   if (!isOpen || !symbol) return null;
 
   const activePoint = hoverIndex !== null && coords[hoverIndex] ? coords[hoverIndex] : lastPoint;
-  const strokeColor = isDcb ? '#f59e0b' : isUp ? '#34d399' : '#f87171';
+  const isNetDown = chartData.length >= 2 ? chartData[chartData.length - 1] < chartData[0] : false;
+  const isBearish = struct?.sentiment === 'BEARISH' || changePercent < -0.001 || isNetDown;
+  const isBullish = struct?.sentiment === 'BULLISH' || (changePercent > 0.001 && !isBearish);
+
+  const strokeColor = isDcb
+    ? '#f59e0b'
+    : isBearish
+    ? '#f87171'
+    : isBullish
+    ? '#34d399'
+    : '#a1a1aa';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
@@ -180,8 +201,8 @@ export function StockChartModal({
               <div className="text-xl font-bold text-white tracking-tight tabular-nums">
                 ₹{ltp.toFixed(2)}
               </div>
-              <div className={`text-xs font-bold tabular-nums ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isUp ? '+' : ''}{changePercent.toFixed(2)}% (₹{change >= 0 ? '+' : ''}{change.toFixed(2)})
+              <div className={`text-xs font-bold tabular-nums ${isBearish ? 'text-red-400' : isBullish ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                {changePercent > 0.001 ? '+' : ''}{changePercent.toFixed(2)}% (₹{change > 0.001 ? '+' : ''}{change.toFixed(2)})
               </div>
             </div>
 
@@ -407,7 +428,7 @@ export function StockChartModal({
                       y="-8" 
                       width="56" 
                       height="15" 
-                      fill={isUp ? '#064e3b' : '#7f1d1d'} 
+                      fill={isBearish ? '#7f1d1d' : isBullish ? '#064e3b' : '#27272a'} 
                       stroke={strokeColor} 
                       strokeWidth="1" 
                     />
