@@ -4,6 +4,7 @@ import { tickRepository } from '../repositories/tickRepository';
 import { signalService } from './signalService';
 import { computeAttentionScore } from '../signal/attention';
 import { calculateMarketStructure } from '../signal/marketStructure';
+import { marketSimulator } from '../marketdata/simulator';
 import { WatchlistDigest, DigestItem } from '../domain/types';
 
 export class DigestService {
@@ -89,11 +90,12 @@ export class DigestService {
 
       const minutesAgo = Math.max(1, Math.round((now - since.getTime()) / (60 * 1000)));
 
+      const sparkline = marketSimulator.getSparkline(symbol, currentTick.ltp, previousPrice);
       const structure = calculateMarketStructure(
         symbol,
         currentTick.ltp,
         percentChange,
-        [previousPrice, currentTick.ltp],
+        sparkline,
         high,
         low
       );

@@ -45,8 +45,19 @@ export function calculateMarketStructure(
     tier = 'L2';
   }
 
-  // 2. 20-period Exponential Moving Average (X-EMA)
-  const series = sparkline.length >= 8 ? sparkline : [ltp * 0.99, ltp * 0.995, ltp];
+  // 2. 20-period Exponential Moving Average (X-EMA) & Price Series
+  let series = sparkline && sparkline.length >= 6 ? [...sparkline] : [];
+  if (series.length < 6) {
+    // Reconstruct honest intraday trajectory from baseline close to ltp using changePercent
+    const basePrice = ltp / (1 + (changePercent || 0) / 100);
+    const steps = 14;
+    series = [];
+    for (let i = 0; i <= steps; i++) {
+      const progress = i / steps;
+      series.push(Number((basePrice + (ltp - basePrice) * progress).toFixed(2)));
+    }
+  }
+
   const period = Math.min(series.length, 14);
   const k = 2 / (period + 1);
   let ema = series[0];
@@ -64,30 +75,24 @@ export function calculateMarketStructure(
 
   // 3. RSI & Overbought / Oversold Detection
   let rsi = 50;
-  if (series.length >= 6) {
-    let gains = 0;
-    let losses = 0;
-    for (let i = 1; i < series.length; i++) {
-      const diff = series[i] - series[i - 1];
-      if (diff > 0) gains += diff;
-      else losses += Math.abs(diff);
-    }
-    const avgGain = gains / (series.length - 1);
-    const avgLoss = losses / (series.length - 1);
-    if (avgLoss === 0) {
-      rsi = 85;
-    } else {
-      const rs = avgGain / avgLoss;
-      rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
-    }
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i < series.length; i++) {
+    const diff = series[i] - series[i - 1];
+    if (diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  const avgGain = gains / (series.length - 1);
+  const avgLoss = losses / (series.length - 1);
+  if (avgLoss === 0 && avgGain === 0) {
+    rsi = 50;
+  } else if (avgLoss === 0) {
+    rsi = 85;
+  } else if (avgGain === 0) {
+    rsi = 15;
   } else {
-    // Fallback: estimate from intraday range position
-    const high = dayHigh || ltp * 1.01;
-    const low = dayLow || ltp * 0.99;
-    const range = high - low;
-    if (range > 0) {
-      rsi = Number((((ltp - low) / range) * 100).toFixed(1));
-    }
+    const rs = avgGain / avgLoss;
+    rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
   }
 
   // Clamp RSI to realistic bounds
@@ -102,10 +107,27 @@ export function calculateMarketStructure(
 
   // 4. Sentiment synthesis
   let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
-  if ((changePercent > 0.3 && emaState === 'ABOVE_EMA') || rsi >= 62) {
-    sentiment = 'BULLISH';
-  } else if ((changePercent < -0.3 && emaState === 'BELOW_EMA') || rsi <= 38) {
-    sentiment = 'BEARISH';
+  if (changePercent >= 0.25) {
+    if (emaState === 'ABOVE_EMA' || rsi >= 55) {
+      sentiment = 'BULLISH';
+    } else {
+      sentiment = 'NEUTRAL';
+    }
+  } else if (changePercent <= -0.25) {
+    if (emaState === 'BELOW_EMA' || rsi <= 45) {
+      sentiment = 'BEARISH';
+    } else {
+      sentiment = 'NEUTRAL';
+    }
+  } else {
+    // Rangebound / close to flat
+    if (emaState === 'ABOVE_EMA' && rsi >= 58) {
+      sentiment = 'BULLISH';
+    } else if (emaState === 'BELOW_EMA' && rsi <= 42) {
+      sentiment = 'BEARISH';
+    } else {
+      sentiment = 'NEUTRAL';
+    }
   }
 
   // 5. Dead Cat Bounce (DCB) Detection

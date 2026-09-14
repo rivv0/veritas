@@ -92,6 +92,8 @@ export interface WsTick {
   low: number;
   open: number;
   close: number;
+  change?: number;
+  changePercent?: number;
   timestamp: string;
 }
 

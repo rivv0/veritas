@@ -1,6 +1,5 @@
 import { config } from '../config';
 import { marketSimulator } from '../marketdata/simulator';
-import { yahooClient } from '../marketdata/yahooClient';
 import { yfCandleClient } from '../marketdata/yfCandleClient';
 import { watchlistService } from './watchlistService';
 import { tickRepository } from '../repositories/tickRepository';
@@ -49,6 +48,8 @@ export class MarketDataService {
             low: liveCandle.low,
             open: liveCandle.open,
             close: liveCandle.close,
+            change: liveCandle.change,
+            changePercent: liveCandle.changePercent,
             timestamp: liveCandle.timestamp.toISOString(),
             isRealCandle: true,
           };
@@ -106,6 +107,9 @@ export class MarketDataService {
           try {
             const tick = marketSimulator.generateTick(symbol);
             await tickRepository.insertTick(tick);
+            const baseClose = tick.close ?? tick.ltp;
+            const change = Number((tick.ltp - baseClose).toFixed(2));
+            const changePercent = baseClose > 0 ? Number(((change / baseClose) * 100).toFixed(2)) : 0;
             const tickPayload = {
               type: 'tick',
               symbol: tick.symbol,
@@ -117,6 +121,8 @@ export class MarketDataService {
               low: tick.low,
               open: tick.open,
               close: tick.close,
+              change,
+              changePercent,
               timestamp: tick.timestamp.toISOString(),
             };
             try {

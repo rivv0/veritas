@@ -76,4 +76,20 @@ describe('Session Delta & Digest Integrity Integration Test', () => {
     expect(isMeaningful).toBe(false); // Quiet session: not flagged as meaningful
     expect(attentionScore).toBeLessThanOrEqual(15); // Low honest score
   });
+
+  it('correctly classifies a dipped stock as BEARISH and below 20-EMA', () => {
+    // Stock dipped -2.1% from ₹1000 to ₹979
+    const structure = calculateMarketStructure(
+      'INFY',
+      979.00,
+      -2.10,
+      [1000.00, 992.00, 985.00, 979.00],
+      1002.00,
+      976.00
+    );
+
+    expect(structure.sentiment).toBe('BEARISH');
+    expect(structure.emaState).toBe('BELOW_EMA');
+    expect(structure.rsi).toBeLessThanOrEqual(45);
+  });
 });

@@ -409,7 +409,12 @@ export function WatchlistTable({
                 return base;
               })();
 
-              const liveChange = tick?.ltp ? (tick.ltp - (tick.close || snap?.close || tick.ltp)) : fallbackChange;
+              const liveChange =
+                tick?.changePercent !== undefined
+                  ? tick.changePercent
+                  : tick?.ltp && tick.close && Math.abs(tick.ltp - tick.close) > 0.01
+                  ? ((tick.ltp - tick.close) / tick.close) * 100
+                  : fallbackChange;
 
               return (
                 <tr

@@ -12,7 +12,8 @@ interface Props {
 }
 
 function DigestCard({ item }: { item: DigestItem }) {
-  const isUp = item.percentChange >= 0;
+  const isUp = item.percentChange > 0.001;
+  const isDown = item.percentChange < -0.001;
   const struct = item.structure;
   
   // Deduplicate signals: keep max 2 unique types
@@ -77,8 +78,16 @@ function DigestCard({ item }: { item: DigestItem }) {
           </div>
         </div>
         
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-none font-mono text-xs font-bold ${isUp ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
-          {isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+        <div
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-none font-mono text-xs font-bold ${
+            isUp
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+              : isDown
+              ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+              : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+          }`}
+        >
+          {isUp ? <ArrowUpRight size={13} /> : isDown ? <ArrowDownRight size={13} /> : null}
           <span>{isUp ? '+' : ''}{item.percentChange.toFixed(2)}%</span>
         </div>
       </div>

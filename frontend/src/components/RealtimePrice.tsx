@@ -15,7 +15,12 @@ export function RealtimePrice({ symbol, tick, fallbackPrice, fallbackChange }: P
   const prevPrice = useRef(fallbackPrice);
 
   const price = tick?.ltp ?? fallbackPrice;
-  const change = tick ? ((price - (tick.close || price)) / (tick.close || price)) * 100 : fallbackChange;
+  const change =
+    tick?.changePercent !== undefined
+      ? tick.changePercent
+      : tick?.close && tick.close !== price
+      ? ((price - tick.close) / tick.close) * 100
+      : fallbackChange;
 
   useEffect(() => {
     if (tick && tick.ltp !== prevPrice.current) {
@@ -26,7 +31,9 @@ export function RealtimePrice({ symbol, tick, fallbackPrice, fallbackChange }: P
     }
   }, [tick]);
 
-  const isUp = change >= 0;
+  const isUp = change > 0.001;
+  const isDown = change < -0.001;
+  const colorClass = isUp ? 'text-emerald-400' : isDown ? 'text-red-400' : 'text-zinc-400';
   const flashClass = flash === 'green' ? 'animate-flash-green' : flash === 'red' ? 'animate-flash-red' : '';
 
   return (
@@ -34,7 +41,7 @@ export function RealtimePrice({ symbol, tick, fallbackPrice, fallbackChange }: P
       <div className="text-xs font-bold text-white tabular-nums tracking-tight">
         ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
-      <div className={`text-[10px] font-bold tabular-nums ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+      <div className={`text-[10px] font-bold tabular-nums ${colorClass}`}>
         {isUp ? '+' : ''}{change.toFixed(2)}%
       </div>
     </div>
