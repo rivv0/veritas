@@ -34,7 +34,9 @@ export class MarketDataService {
       try {
         const liveCandle = await yfCandleClient.fetchLatest(symbol);
         if (!liveCandle) {
-          console.warn(`[MarketData] No data for ${symbol}`);
+          if (!yahooClient.isRateLimited()) {
+            console.warn(`[MarketData] No data for ${symbol}`);
+          }
           continue;
         }
         realTicksCount++;
@@ -92,11 +94,33 @@ export class MarketDataService {
         console.error(`[MarketData] Error syncing quote for ${symbol}:`, err.message || err);
       }
     }
+  }
 
-    // Quick hack for demo/cloud environments when Yahoo blocks the server IP (e.g. Render):
-    // If all symbols returned null and the simulator timer isn't already running, generate ticks so the platform isn't dead
-    if (realTicksCount === 0 && symbols.length > 0 && !this.timer) {
-      console.warn('[MarketData] Real market feed returned 0 quotes (Yahoo IP block or offline). Emitting fallback ticks so terminal remains active.');
+  async syncSymbolStats() {
+    await this.refreshTrackedSymbols();
+    const symbols = Array.from(this.trackedSymbols);
+    for (const symbol of symbols) {
+      try {
+        const avgVol = await yahooClient.fetch20DayAvgVolume(symbol);
+        if (avgVol && avgVol > 0) {
+          const sql = `
+            INSERT INTO symbol_stats (symbol, avg_volume_20d, updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (symbol) DO UPDATE SET avg_volume_20d = EXCLUDED.avg_volume_20d, updated_at = NOW()
+          `;
+          await query(sql, [symbol, avgVol]);
+        }
+      } catch (err) {
+        // Continue to next symbol
+      }
+    }
+  }
+
+  startFallbackSimulator() {
+    if (this.timer) return;
+    console.log('[MarketDataService] Continuous fallback tick streamer active (ensures real-time streaming)');
+    this.timer = setInterval(async () => {
+      const symbols = Array.from(this.trackedSymbols);
       for (const symbol of symbols) {
         try {
           const tick = marketSimulator.generateTick(symbol);
@@ -123,34 +147,36 @@ export class MarketDataService {
             await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
           } catch (e) {}
           wsManager.broadcastToSymbol(symbol, tickPayload);
+
+          const signals = await signalEngine.processTick(tick);
+          for (const signal of signals) {
+            const signalPayload = {
+              type: 'signal',
+              symbol: signal.symbol,
+              signalType: signal.signalType,
+              severity: signal.severity,
+              description: signal.description,
+              metadata: signal.metadata,
+              timestamp: signal.triggeredAt.toISOString(),
+            };
+            try {
+              await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
+            } catch (e) {}
+            wsManager.broadcastToSymbol(symbol, signalPayload);
+          }
         } catch (err) {}
       }
-    }
-  }
-
-  async syncSymbolStats() {
-    await this.refreshTrackedSymbols();
-    const symbols = Array.from(this.trackedSymbols);
-    for (const symbol of symbols) {
-      try {
-        const avgVol = await yahooClient.fetch20DayAvgVolume(symbol);
-        if (avgVol && avgVol > 0) {
-          const sql = `
-            INSERT INTO symbol_stats (symbol, avg_volume_20d, updated_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (symbol) DO UPDATE SET avg_volume_20d = EXCLUDED.avg_volume_20d, updated_at = NOW()
-          `;
-          await query(sql, [symbol, avgVol]);
-        }
-      } catch (err) {
-        // Continue to next symbol
-      }
-    }
+    }, config.market.tickIntervalMs || 2000);
   }
 
   startTickStream() {
     if (this.realSyncTimer) return;
-    console.log('[MarketDataService] Starting Real-Feed Market Data Streamer (Yahoo 1m Candles)...');
+    console.log('[MarketDataService] Starting Market Data Streamer...');
+
+    // Only enable synthetic simulator if explicitly requested via environment variable
+    if (process.env.ENABLE_SYNTHETIC_SIMULATOR === 'true') {
+      this.startFallbackSimulator();
+    }
 
     // 1. Immediate real market candle sync & true 20-day volume history sync
     this.syncRealQuotes().catch(console.error);
@@ -165,42 +191,6 @@ export class MarketDataService {
     this.statsSyncTimer = setInterval(() => {
       this.syncSymbolStats().catch(console.error);
     }, 24 * 60 * 60 * 1000);
-
-    // 3. Optional offline/after-hours Brownian motion micro-tick simulator (only if explicitly enabled)
-    if (process.env.ENABLE_SYNTHETIC_SIMULATOR === 'true') {
-      console.log('[MarketDataService] Offline synthetic simulator enabled as secondary fallback');
-      this.timer = setInterval(async () => {
-        const symbols = Array.from(this.trackedSymbols);
-        for (const symbol of symbols) {
-          try {
-            const tick = marketSimulator.generateTick(symbol);
-            await tickRepository.insertTick(tick);
-            const baseClose = tick.close ?? tick.ltp;
-            const change = Number((tick.ltp - baseClose).toFixed(2));
-            const changePercent = baseClose > 0 ? Number(((change / baseClose) * 100).toFixed(2)) : 0;
-            const tickPayload = {
-              type: 'tick',
-              symbol: tick.symbol,
-              ltp: tick.ltp,
-              volume: tick.volume,
-              bid: tick.bid,
-              ask: tick.ask,
-              high: tick.high,
-              low: tick.low,
-              open: tick.open,
-              close: tick.close,
-              change,
-              changePercent,
-              timestamp: tick.timestamp.toISOString(),
-            };
-            try {
-              await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
-            } catch (e) {}
-            wsManager.broadcastToSymbol(symbol, tickPayload);
-          } catch (err) {}
-        }
-      }, config.market.tickIntervalMs || 2500);
-    }
   }
 
   stopTickStream() {

@@ -19,18 +19,38 @@ const USER_AGENTS = [
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
 ];
 
+const US_EQUITIES = new Set(['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META', 'WIT']);
+const SYMBOL_MAP: Record<string, string> = {
+  GROWW: 'ANGELONE.NS',
+  TATAMOTORS: 'TMCV.NS',
+  ZOMATO: 'ETERNAL.NS',
+};
+
 export class YahooClient {
   private cache: Map<string, CacheEntry> = new Map();
   private cacheTTLMs = 60000; // 60 seconds cache to prevent spamming and rate-limiting
   private avgVolCache: Map<string, { value: number; expiresAt: number }> = new Map();
   private throttleQueue: Promise<void> = Promise.resolve();
-  private minIntervalMs = 180; // Pacing between Yahoo calls to completely avoid 429 rate limits
+  private minIntervalMs = 500; // Paced between Yahoo calls to completely avoid 429 rate limits
   private uaIndex = 0;
+  private rateLimitedUntil = 0;
+
+  isRateLimited(): boolean {
+    return Date.now() < this.rateLimitedUntil;
+  }
 
   private getNextUserAgent(): string {
     const ua = USER_AGENTS[this.uaIndex % USER_AGENTS.length];
     this.uaIndex++;
     return ua;
+  }
+
+  private getYahooTicker(symbol: string): string {
+    const clean = symbol.trim().toUpperCase();
+    if (SYMBOL_MAP[clean]) return SYMBOL_MAP[clean];
+    if (US_EQUITIES.has(clean)) return clean;
+    if (clean.includes('.')) return clean;
+    return `${clean}.NS`;
   }
 
   private throttle(): Promise<void> {
@@ -41,43 +61,41 @@ export class YahooClient {
   }
 
   async fetchQuote(symbol: string): Promise<LiveStockData | null> {
+    if (this.isRateLimited()) {
+      return null;
+    }
+
     const cleanSym = symbol.trim().toUpperCase();
     const cached = this.cache.get(cleanSym);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
 
-    const SYMBOL_ALIASES: Record<string, string[]> = {
-      GROWW: ['GROWW.NS', 'GROWW.BO', 'GROWW'],
-      TATAMOTORS: ['TMCV.NS', 'TMPV.NS', 'TATAMOTORS.NS'],
-      ZOMATO: ['ETERNAL.NS', 'ZOMATO.NS'],
-    };
+    const ticker = this.getYahooTicker(cleanSym);
 
-    // Try primary symbol (append .NS if no suffix), then fallback to raw symbol
-    const candidates = SYMBOL_ALIASES[cleanSym] || (cleanSym.includes('.')
-      ? [cleanSym]
-      : [`${cleanSym}.NS`, cleanSym]);
+    for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+      try {
+        await this.throttle();
+        const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
+          ticker
+        )}?interval=1m&range=1d`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': this.getNextUserAgent(),
+            Accept: 'application/json',
+          },
+          signal: AbortSignal.timeout(8000),
+        });
 
-    for (const candidate of candidates) {
-      for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
-        try {
-          await this.throttle();
-          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
-            candidate
-          )}?interval=1m&range=1d`;
-          
-          const response = await fetch(url, {
-            headers: {
-              'User-Agent': this.getNextUserAgent(),
-              Accept: 'application/json',
-            },
-            signal: AbortSignal.timeout(8000),
-          });
-
-          if (!response.ok) {
-            console.error(`[Yahoo] ${candidate} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          if (response.status === 429) {
+            console.warn(`[Yahoo] 429 Too Many Requests from ${host} for ${ticker}`);
             continue;
           }
+          console.error(`[Yahoo] ${ticker} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
+          continue;
+        }
 
         const json: any = await response.json();
         const result = json?.chart?.result?.[0];
@@ -131,78 +149,75 @@ export class YahooClient {
         });
 
         return liveData;
-        } catch (err: any) {
-          console.error(`[Yahoo] ${candidate} @ ${host} failed:`, err.message || err);
-          continue;
-        }
+      } catch (err: any) {
+        console.error(`[Yahoo] ${ticker} @ ${host} failed:`, err.message || err);
+        continue;
       }
     }
 
-    console.warn(`[Yahoo] All candidates failed for ${cleanSym}`);
+    console.warn(`[Yahoo] Quote failed for ${cleanSym} (${ticker})`);
     return null;
   }
 
   async fetch20DayAvgVolume(symbol: string): Promise<number | null> {
+    if (this.isRateLimited()) {
+      return null;
+    }
+
     const cleanSym = symbol.trim().toUpperCase();
     const cached = this.avgVolCache.get(cleanSym);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.value;
     }
 
-    const SYMBOL_ALIASES: Record<string, string[]> = {
-      GROWW: ['GROWW.NS', 'GROWW.BO', 'GROWW'],
-      TATAMOTORS: ['TMCV.NS', 'TMPV.NS', 'TATAMOTORS.NS'],
-      ZOMATO: ['ETERNAL.NS', 'ZOMATO.NS'],
-    };
+    const ticker = this.getYahooTicker(cleanSym);
 
-    const candidates = SYMBOL_ALIASES[cleanSym] || (cleanSym.includes('.')
-      ? [cleanSym]
-      : [`${cleanSym}.NS`, cleanSym]);
+    for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+      try {
+        await this.throttle();
+        const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
+          ticker
+        )}?interval=1d&range=1mo`;
 
-    for (const candidate of candidates) {
-      for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
-        try {
-          await this.throttle();
-          const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
-            candidate
-          )}?interval=1d&range=1mo`;
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': this.getNextUserAgent(),
+            Accept: 'application/json',
+          },
+          signal: AbortSignal.timeout(8000),
+        });
 
-          const response = await fetch(url, {
-            headers: {
-              'User-Agent': this.getNextUserAgent(),
-              Accept: 'application/json',
-            },
-            signal: AbortSignal.timeout(8000),
-          });
-
-          if (!response.ok) {
-            console.error(`[Yahoo-Stats] ${candidate} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          if (response.status === 429) {
+            console.warn(`[Yahoo-Stats] 429 Too Many Requests from ${host} for ${ticker}`);
             continue;
           }
-
-          const json: any = await response.json();
-          const result = json?.chart?.result?.[0];
-          if (!result) continue;
-
-          const rawVols: (number | null)[] = result.indicators?.quote?.[0]?.volume || [];
-          const validVols = rawVols.filter((v): v is number => typeof v === 'number' && !isNaN(v) && v > 0);
-
-          if (validVols.length > 0) {
-            const recent20 = validVols.slice(-20);
-            const avgVol = Math.round(recent20.reduce((sum, v) => sum + v, 0) / recent20.length);
-            this.avgVolCache.set(cleanSym, {
-              value: avgVol,
-              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-            });
-            return avgVol;
-          }
-        } catch (err: any) {
-          console.error(`[Yahoo-Stats] ${candidate} @ ${host} failed:`, err.message || err);
+          console.error(`[Yahoo-Stats] ${ticker} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
           continue;
         }
+
+        const json: any = await response.json();
+        const result = json?.chart?.result?.[0];
+        if (!result) continue;
+
+        const rawVols: (number | null)[] = result.indicators?.quote?.[0]?.volume || [];
+        const validVols = rawVols.filter((v): v is number => typeof v === 'number' && !isNaN(v) && v > 0);
+
+        if (validVols.length > 0) {
+          const recent20 = validVols.slice(-20);
+          const avgVol = Math.round(recent20.reduce((sum, v) => sum + v, 0) / recent20.length);
+          this.avgVolCache.set(cleanSym, {
+            value: avgVol,
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          });
+          return avgVol;
+        }
+      } catch (err: any) {
+        console.error(`[Yahoo-Stats] ${ticker} @ ${host} failed:`, err.message || err);
+        continue;
       }
     }
-    console.warn(`[Yahoo-Stats] All candidates failed for ${cleanSym}`);
+    console.warn(`[Yahoo-Stats] Failed to fetch 20-day volume for ${cleanSym} (${ticker})`);
     return null;
   }
 
