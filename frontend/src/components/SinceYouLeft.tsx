@@ -3,6 +3,7 @@
 import { ArrowUpRight, ArrowDownRight, Clock, Sparkles, TrendingUp, TrendingDown, Layers, Activity } from 'lucide-react';
 import type { WatchlistDigest, DigestItem } from '@/lib/types';
 import { SignalBadge } from './SignalBadge';
+import { getCurrencySymbol } from '@/lib/formatters';
 
 interface Props {
   digest: WatchlistDigest | null;
@@ -15,6 +16,7 @@ function DigestCard({ item }: { item: DigestItem }) {
   const isUp = item.percentChange > 0.001;
   const isDown = item.percentChange < -0.001;
   const struct = item.structure;
+  const curr = getCurrencySymbol(item.symbol);
   
   // Deduplicate signals: keep max 2 unique types
   const uniqueSignals: typeof item.signals = [];
@@ -72,9 +74,9 @@ function DigestCard({ item }: { item: DigestItem }) {
         <div>
           <div className="text-[9px] text-zinc-400 mb-0.5">Price Delta</div>
           <div className="flex items-center gap-1.5">
-            <span className="text-zinc-400 text-xs">₹{item.previousPrice.toFixed(2)}</span>
+            <span className="text-zinc-400 text-xs">{curr}{item.previousPrice.toFixed(2)}</span>
             <span className="text-zinc-400">→</span>
-            <span className="text-white font-bold text-xs">₹{item.currentPrice.toFixed(2)}</span>
+            <span className="text-white font-bold text-xs">{curr}{item.currentPrice.toFixed(2)}</span>
           </div>
         </div>
         
@@ -113,6 +115,7 @@ function DigestCard({ item }: { item: DigestItem }) {
               type={sig.signalType || sig.type}
               severity={sig.severity}
               description={sig.description}
+              symbol={item.symbol}
               metadata={sig.metadata}
             />
           ))}

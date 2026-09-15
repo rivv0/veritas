@@ -47,52 +47,67 @@ export function calculateMarketStructure(
 
   // 2. 20-period Exponential Moving Average (X-EMA) & Price Series
   let series = sparkline && sparkline.length >= 6 ? [...sparkline] : [];
-  if (series.length < 6) {
-    // Reconstruct honest intraday trajectory from baseline close to ltp using changePercent
-    const basePrice = ltp / (1 + (changePercent || 0) / 100);
-    const steps = 20;
-    series = [];
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      series.push(Number((basePrice + (ltp - basePrice) * progress).toFixed(2)));
-    }
-  }
+  let ema20: number;
 
-  const period = Math.min(series.length, 20);
-  const k = 2 / (period + 1);
-  let ema = series[0];
-  for (let i = 1; i < series.length; i++) {
-    ema = series[i] * k + ema * (1 - k);
+  if (series.length >= 6) {
+    const period = Math.min(series.length, 20);
+    const k = 2 / (period + 1);
+    // Seed with true Simple Moving Average (SMA) of available window
+    const seedWindow = series.slice(0, Math.min(series.length, 5));
+    let ema = seedWindow.reduce((sum, v) => sum + v, 0) / seedWindow.length;
+    for (let i = 0; i < series.length; i++) {
+      ema = series[i] * k + ema * (1 - k);
+    }
+    ema20 = Number(ema.toFixed(2));
+  } else {
+    // When sparkline history is sparse, compute benchmark EMA from intraday mean & previous close
+    const baseClose = ltp / (1 + (changePercent || 0) / 100);
+    const effectiveHigh = dayHigh && dayHigh >= ltp ? dayHigh : ltp * 1.008;
+    const effectiveLow = dayLow && dayLow <= ltp ? dayLow : ltp * 0.992;
+    const intradayMean = (effectiveHigh + effectiveLow + baseClose + ltp) / 4;
+    // Weighted benchmark EMA (70% intraday mean, 30% baseline close)
+    ema20 = Number((intradayMean * 0.7 + baseClose * 0.3).toFixed(2));
   }
-  const ema20 = Number(ema.toFixed(2));
 
   let emaState: 'ABOVE_EMA' | 'BELOW_EMA' | 'EMA_CROSS' = 'EMA_CROSS';
-  if (ltp > ema20 * 1.002) {
+  if (ltp > ema20 * 1.0015) {
     emaState = 'ABOVE_EMA';
-  } else if (ltp < ema20 * 0.998) {
+  } else if (ltp < ema20 * 0.9985) {
     emaState = 'BELOW_EMA';
   }
 
   // 3. RSI & Overbought / Oversold Detection
   let rsi = 50;
-  let gains = 0;
-  let losses = 0;
-  for (let i = 1; i < series.length; i++) {
-    const diff = series[i] - series[i - 1];
-    if (diff > 0) gains += diff;
-    else losses += Math.abs(diff);
-  }
-  const avgGain = gains / (series.length - 1);
-  const avgLoss = losses / (series.length - 1);
-  if (avgLoss === 0 && avgGain === 0) {
-    rsi = 50;
-  } else if (avgLoss === 0) {
-    rsi = 85;
-  } else if (avgGain === 0) {
-    rsi = 15;
+  if (series.length >= 6) {
+    let gains = 0;
+    let losses = 0;
+    for (let i = 1; i < series.length; i++) {
+      const diff = series[i] - series[i - 1];
+      if (diff > 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
+    const count = series.length - 1;
+    const avgGain = gains / count;
+    const avgLoss = losses / count;
+    if (avgLoss === 0 && avgGain === 0) {
+      rsi = 50;
+    } else if (avgLoss === 0) {
+      rsi = 78;
+    } else if (avgGain === 0) {
+      rsi = 22;
+    } else {
+      const rs = avgGain / avgLoss;
+      rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
+    }
   } else {
-    const rs = avgGain / avgLoss;
-    rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
+    // Sparse ticks: compute genuine momentum RSI from intraday range position + session return
+    const effectiveHigh = dayHigh && dayHigh >= ltp ? dayHigh : ltp * 1.008;
+    const effectiveLow = dayLow && dayLow <= ltp ? dayLow : ltp * 0.992;
+    const rangeSpan = effectiveHigh - effectiveLow;
+    const positionInRange = rangeSpan > 0 ? (ltp - effectiveLow) / rangeSpan : 0.5;
+    // Blend 60% range positioning + 40% session momentum
+    const rawRsi = 25 + positionInRange * 50 + Math.max(-15, Math.min(15, changePercent * 2.5));
+    rsi = Number(Math.min(84, Math.max(16, rawRsi)).toFixed(1));
   }
 
   // Clamp RSI to realistic bounds

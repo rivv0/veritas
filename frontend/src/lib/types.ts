@@ -98,6 +98,7 @@ export interface WsTick {
 }
 
 export interface WsSignal {
+  id?: string;
   type: 'signal';
   symbol: string;
   signalType: string;

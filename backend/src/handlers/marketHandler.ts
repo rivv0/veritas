@@ -171,7 +171,9 @@ export class MarketHandler {
   async getDigest(req: AuthenticatedRequest, res: Response) {
     try {
       const { id } = req.params;
-      const digest = await digestService.generateDigest(req.userId!, req.deviceFp!, id);
+      const rawLookback = (req.query.lookbackMinutes || req.query.lookback) as string;
+      const lookbackMinutes = rawLookback ? parseInt(rawLookback, 10) : undefined;
+      const digest = await digestService.generateDigest(req.userId!, req.deviceFp!, id, lookbackMinutes);
       res.json({ success: true, data: digest });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

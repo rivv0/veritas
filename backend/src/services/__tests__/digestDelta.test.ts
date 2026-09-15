@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { calculateMarketStructure } from '../../signal/marketStructure';
 import { computeAttentionScore } from '../../signal/attention';
 import { Tick } from '../../domain/types';
+import { yahooClient } from '../../marketdata/yahooClient';
 
 describe('Session Delta & Digest Integrity Integration Test', () => {
   it('correctly computes session delta, meaningful flag, and attention score from two historical tick states', () => {
@@ -91,5 +92,20 @@ describe('Session Delta & Digest Integrity Integration Test', () => {
     expect(structure.sentiment).toBe('BEARISH');
     expect(structure.emaState).toBe('BELOW_EMA');
     expect(structure.rsi).toBeLessThanOrEqual(45);
+  });
+
+  it('respects lookbackMinutes parameter when calculating digest window', async () => {
+    vi.spyOn(yahooClient, 'fetchQuote').mockResolvedValue(null);
+    const { digestService } = await import('../digestService');
+    const lookbackMinutes = 45;
+    const beforeCall = Date.now();
+
+    const digest = await digestService.generateDigest('demo-user', 'web-default', 'wl-core', lookbackMinutes);
+
+    expect(digest).toBeDefined();
+    expect(digest.since).toBeInstanceOf(Date);
+    const expectedSinceMs = beforeCall - lookbackMinutes * 60 * 1000;
+    // Difference should be within 1000ms
+    expect(Math.abs(digest.since.getTime() - expectedSinceMs)).toBeLessThan(2000);
   });
 });

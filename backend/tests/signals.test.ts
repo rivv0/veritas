@@ -141,5 +141,113 @@ describe('Signal Engine Modules Verification', () => {
       expect(structure.ema20).toBeLessThan(120);
       expect(structure.emaState).toBe('ABOVE_EMA');
     });
+
+    it('prevents degenerate fallback (ema20 === ltp and rsi === 50.0) when sparkline is sparse but day range exists', () => {
+      // Sparse sparkline of only 2 ticks (common on static or newly tracked symbols)
+      const sparseSparkline = [200.0, 200.0];
+      const structure = calculateMarketStructure(
+        'GROWW',
+        200.0,
+        2.12, // +2.12% move from base close
+        sparseSparkline,
+        204.0, // high
+        194.0  // low
+      );
+
+      // Must NOT be trivially equal to ltp or 50.0
+      expect(structure.ema20).not.toBe(200.0);
+      expect(structure.ema20).toBeCloseTo(197.96, 0);
+      expect(structure.rsi).not.toBe(50.0);
+      expect(structure.rsi).toBeGreaterThan(50.0); // +2.12% session gain should show momentum > 50
+    });
+  });
+
+  describe('Static Market Signal Deduplication', () => {
+    it('suppresses identical signal re-fire when price and condition have not moved', async () => {
+      const { SignalEngine } = await import('../src/signal/engine');
+      const engine = new SignalEngine();
+
+      const tick1: Tick = {
+        timestamp: new Date('2026-09-15T10:00:00Z'),
+        symbol: 'NVDA',
+        ltp: 120.0,
+        high: 121.0,
+        low: 119.0,
+        volume: 50000000,
+        close: 120.0, // Quiet initial tick to establish baseline
+      };
+
+      const tick2: Tick = {
+        timestamp: new Date('2026-09-15T10:01:00Z'),
+        symbol: 'NVDA',
+        ltp: 120.0,
+        high: 121.0,
+        low: 119.0,
+        volume: 50100000,
+        close: 130.0, // -7.7% drop vs base close -> volatility spike
+      };
+
+      // Seed previous tick so delta is calculated
+      await engine.processTick(tick1);
+
+      // First trigger: price is 120.0, drop vs close triggers volatility spike
+      const signalsFirst = await engine.processTick(tick2);
+      expect(signalsFirst.length).toBe(1);
+      expect(signalsFirst[0].symbol).toBe('NVDA');
+
+      // Now simulate arrival 5 minutes later (past the 3-minute symbol cooldown)
+      // but price and market condition are completely UNCHANGED (market is static/closed)
+      const staticTick: Tick = {
+        timestamp: new Date('2026-09-15T10:06:00Z'),
+        symbol: 'NVDA',
+        ltp: 120.0, // Exact same price
+        high: 121.0,
+        low: 119.0,
+        volume: 50100000,
+        close: 130.0,
+      };
+
+      const signalsSecond = await engine.processTick(staticTick);
+      // Deduplication MUST suppress this static market spam
+      expect(signalsSecond.length).toBe(0);
+
+      // Now simulate a genuine price shift of -4.1% (to 115.0) 5 minutes later
+      const shiftedTick: Tick = {
+        timestamp: new Date('2026-09-15T10:11:00Z'),
+        symbol: 'NVDA',
+        ltp: 115.0,
+        high: 121.0,
+        low: 114.0,
+        volume: 55000000,
+        close: 130.0,
+      };
+
+      // When price genuinely moves, it is not blocked by the static dedupe rule
+      const signalsThird = await engine.processTick(shiftedTick);
+      expect(signalsThird.length).toBe(1);
+      expect(signalsThird[0].symbol).toBe('NVDA');
+    });
+  });
+
+  describe('News Sentiment Analysis Rigor', () => {
+    it('correctly tags bearish headlines instead of falsely marking them Bullish', async () => {
+      const { inferNewsTag } = await import('../src/services/newsService');
+
+      expect(inferNewsTag('Reliance sinks to 52-week low amid broad market selloff')).toBe('Bearish');
+      expect(inferNewsTag('Infosys plunges 4% as revenue guidance slashed')).toBe('Bearish');
+      expect(inferNewsTag('Tata Motors tumbles on weak European sales data')).toBe('Bearish');
+      expect(inferNewsTag('HDFC Bank shares drop 3% on margin compression')).toBe('Bearish');
+    });
+
+    it('correctly tags bullish headlines, regulatory notices, and corporate earnings', async () => {
+      const { inferNewsTag } = await import('../src/services/newsService');
+
+      expect(inferNewsTag('Tata Motors surges to record high on EV expansion')).toBe('Bullish');
+      expect(inferNewsTag('Wipro rallies 5% on upbeat revenue pipeline')).toBe('Bullish');
+      expect(inferNewsTag('ICICI Bank reports Q4 net profit jump of 18%')).toBe('Earnings');
+      expect(inferNewsTag('L&T bags order win worth Rs 5,000 crore')).toBe('Deal');
+      expect(inferNewsTag('HDFC Bank faces RBI regulatory scrutiny')).toBe('Regulatory');
+    });
   });
 });
+

@@ -127,11 +127,12 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO watchlists (id, user_id, name, is_default, sort_order) VALUES
 ('wl-core', 'demo-user', 'Nifty 50 Core', TRUE, 1),
 ('wl-tech', 'demo-user', 'IT & Banking Giants', FALSE, 2),
-('wl-growth', 'demo-user', 'High Growth & Tech', FALSE, 3)
+('wl-growth', 'demo-user', 'India High Growth & Fintech', FALSE, 3),
+('wl-us', 'demo-user', 'US Tech Titans', FALSE, 4)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order;
 
 -- Clear previous items for seeded watchlists to avoid duplicate keys on re-run
-DELETE FROM watchlist_items WHERE watchlist_id IN ('wl-core', 'wl-tech', 'wl-growth');
+DELETE FROM watchlist_items WHERE watchlist_id IN ('wl-core', 'wl-tech', 'wl-growth', 'wl-us');
 
 -- Nifty 50 Core Items (16 Stocks with Honorary GROWW)
 INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
@@ -163,19 +164,29 @@ INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
 ('wi-22', 'wl-tech', 'SBIN', 7),
 ('wi-23', 'wl-tech', 'KOTAKBANK', 8),
 ('wi-24', 'wl-tech', 'AXISBANK', 9),
-('wi-25', 'wl-tech', 'WIT', 10);
+('wi-25', 'wl-tech', 'TECHM', 10);
 
--- High Growth & Tech Items (9 Stocks with Honorary GROWW)
+-- High Growth & Fintech Items (9 Indian Stocks with Honorary GROWW)
 INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
 ('wi-growth-0', 'wl-growth', 'GROWW', 0),
 ('wi-26', 'wl-growth', 'ZOMATO', 1),
 ('wi-27', 'wl-growth', 'PAYTM', 2),
 ('wi-28', 'wl-growth', 'JIOFIN', 3),
 ('wi-29', 'wl-growth', 'TATAMOTORS', 4),
-('wi-30', 'wl-growth', 'NVDA', 5),
-('wi-31', 'wl-growth', 'AAPL', 6),
-('wi-32', 'wl-growth', 'TSLA', 7),
-('wi-33', 'wl-growth', 'MSFT', 8);
+('wi-30', 'wl-growth', 'HAL', 5),
+('wi-31', 'wl-growth', 'BEL', 6),
+('wi-32', 'wl-growth', 'TRENT', 7),
+('wi-33', 'wl-growth', 'VBL', 8);
+
+-- US Tech Titans Items (7 US Equities)
+INSERT INTO watchlist_items (id, watchlist_id, symbol, sort_order) VALUES
+('wi-us-1', 'wl-us', 'NVDA', 1),
+('wi-us-2', 'wl-us', 'AAPL', 2),
+('wi-us-3', 'wl-us', 'MSFT', 3),
+('wi-us-4', 'wl-us', 'GOOGL', 4),
+('wi-us-5', 'wl-us', 'AMZN', 5),
+('wi-us-6', 'wl-us', 'TSLA', 6),
+('wi-us-7', 'wl-us', 'META', 7);
 
 -- Initial Sessions Seed for "Since You Left" digest calculation
 INSERT INTO user_sessions (user_id, device_fp, last_seen_at, last_watchlist_id) VALUES

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import type { WsTick } from '@/lib/types';
+import { formatPrice } from '@/lib/formatters';
 
 interface Props {
   symbol: string;
@@ -39,7 +40,7 @@ export function RealtimePrice({ symbol, tick, fallbackPrice, fallbackChange }: P
   return (
     <div className={`text-right p-1 rounded-none transition-colors ${flashClass} font-mono`}>
       <div className="text-xs font-bold text-white tabular-nums tracking-tight">
-        ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {formatPrice(price, symbol)}
       </div>
       <div className={`text-[10px] font-bold tabular-nums ${colorClass}`}>
         {isUp ? '+' : ''}{change.toFixed(2)}%

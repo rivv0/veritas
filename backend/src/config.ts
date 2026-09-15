@@ -18,15 +18,30 @@ export const config = {
   },
   market: {
     tickIntervalMs: 2000,
-    symbols: ['GROWW', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'WIT'],
+    symbols: [
+      'GROWW', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL',
+      'ITC', 'TATAMOTORS', 'LT', 'BAJFINANCE', 'MARUTI', 'SUNPHARMA', 'TITAN', 'AXISBANK',
+      'WIPRO', 'HCLTECH', 'ZOMATO', 'PAYTM', 'JIOFIN',
+      'NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META'
+    ],
     sectorEtfMap: {
       'GROWW': 'NIFTYFIN',
       'TCS': 'NIFTYIT',
       'INFY': 'NIFTYIT',
-      'WIT': 'NIFTYIT',
+      'WIPRO': 'NIFTYIT',
+      'HCLTECH': 'NIFTYIT',
       'HDFCBANK': 'BANKNIFTY',
       'ICICIBANK': 'BANKNIFTY',
+      'SBIN': 'BANKNIFTY',
+      'AXISBANK': 'BANKNIFTY',
       'RELIANCE': 'NIFTY50',
+      'NVDA': 'QQQ',
+      'AAPL': 'QQQ',
+      'MSFT': 'QQQ',
+      'GOOGL': 'QQQ',
+      'AMZN': 'QQQ',
+      'TSLA': 'QQQ',
+      'META': 'QQQ',
     } as Record<string, string>,
   },
 };

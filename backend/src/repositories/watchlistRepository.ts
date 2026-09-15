@@ -99,7 +99,7 @@ export class WatchlistRepository {
         isDefault: true,
         sortOrder: 1,
         symbols: [
-          'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK',
+          'GROWW', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK',
           'SBIN', 'BHARTIARTL', 'ITC', 'TATAMOTORS', 'LT',
           'BAJFINANCE', 'MARUTI', 'SUNPHARMA', 'TITAN', 'AXISBANK'
         ],
@@ -110,16 +110,24 @@ export class WatchlistRepository {
         sortOrder: 2,
         symbols: [
           'TCS', 'INFY', 'WIPRO', 'HCLTECH', 'HDFCBANK',
-          'ICICIBANK', 'SBIN', 'KOTAKBANK', 'AXISBANK', 'WIT'
+          'ICICIBANK', 'SBIN', 'KOTAKBANK', 'AXISBANK', 'TECHM'
         ],
       },
       {
-        name: 'High Growth & Tech',
+        name: 'India High Growth & Fintech',
         isDefault: false,
         sortOrder: 3,
         symbols: [
-          'ZOMATO', 'PAYTM', 'JIOFIN', 'TATAMOTORS',
-          'NVDA', 'AAPL', 'TSLA', 'MSFT'
+          'GROWW', 'ZOMATO', 'PAYTM', 'JIOFIN', 'TATAMOTORS',
+          'HAL', 'BEL', 'TRENT', 'VBL'
+        ],
+      },
+      {
+        name: 'US Tech Titans',
+        isDefault: false,
+        sortOrder: 4,
+        symbols: [
+          'NVDA', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META'
         ],
       },
     ];

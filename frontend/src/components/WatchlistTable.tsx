@@ -16,6 +16,7 @@ import { SignalBadge } from './SignalBadge';
 import { StaleIndicator } from './StaleIndicator';
 import { AddSymbolModal } from './AddSymbolModal';
 import { Sparkline } from './Sparkline';
+import { getCurrencySymbol } from '@/lib/formatters';
 import type { Watchlist, WsTick, WsSignal, MarketSnapshot } from '@/lib/types';
 
 interface Props {
@@ -393,6 +394,7 @@ export function WatchlistTable({
               const high = tick?.high ?? snap?.high ?? fallbackPrice;
               const low = tick?.low ?? snap?.low ?? fallbackPrice;
               const volume = tick?.volume ?? snap?.volume ?? 0;
+              const curr = getCurrencySymbol(symbol);
 
               const isDragging = draggedIndex === idx;
               const isDragOver = dragOverIndex === idx;
@@ -534,8 +536,8 @@ export function WatchlistTable({
 
                   {/* High / Low */}
                   <td className="py-3 px-4 text-right hidden md:table-cell font-mono text-xs text-zinc-300 tabular-nums">
-                    <div>₹{high.toFixed(2)}</div>
-                    <div className="text-zinc-500 text-[10px]">₹{low.toFixed(2)}</div>
+                    <div>{curr}{high.toFixed(2)}</div>
+                    <div className="text-zinc-500 text-[10px]">{curr}{low.toFixed(2)}</div>
                   </td>
 
                   {/* Volume */}
@@ -580,6 +582,7 @@ export function WatchlistTable({
                               type={sig.signalType}
                               severity={sig.severity}
                               description={sig.description}
+                              symbol={symbol}
                               metadata={sig.metadata}
                             />
                           ))

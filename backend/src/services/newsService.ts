@@ -156,27 +156,116 @@ export class NewsService {
   }
 
   private inferTag(title: string): NewsItem['tag'] {
-    const lower = title.toLowerCase();
-    if (lower.includes('surge') || lower.includes('jump') || lower.includes('gain') || lower.includes('rally') || lower.includes('bull')) {
-      return 'Bullish';
-    }
-    if (lower.includes('fall') || lower.includes('drop') || lower.includes('down') || lower.includes('plunge') || lower.includes('bear')) {
-      return 'Bearish';
-    }
-    if (lower.includes('quarter') || lower.includes('q1') || lower.includes('q2') || lower.includes('q3') || lower.includes('q4') || lower.includes('earnings') || lower.includes('profit') || lower.includes('revenue')) {
-      return 'Earnings';
-    }
-    if (lower.includes('deal') || lower.includes('order') || lower.includes('contract') || lower.includes('acquisition') || lower.includes('partnership')) {
-      return 'Deal';
-    }
-    if (lower.includes('target') || lower.includes('rating') || lower.includes('buy') || lower.includes('brokerage') || lower.includes('reiterates')) {
-      return 'Analyst';
-    }
-    if (lower.includes('regulator') || lower.includes('sebi') || lower.includes('rbi') || lower.includes('clearance') || lower.includes('court') || lower.includes('tax')) {
-      return 'Regulatory';
-    }
-    return 'General';
+    return inferNewsTag(title);
   }
+}
+
+export function inferNewsTag(title: string): NewsItem['tag'] {
+  const lower = title.toLowerCase();
+
+  // 1. Regulatory events
+  if (
+    lower.includes('regulator') ||
+    lower.includes('sebi') ||
+    lower.includes('rbi') ||
+    lower.includes('clearance') ||
+    lower.includes('court') ||
+    lower.includes('tax')
+  ) {
+    return 'Regulatory';
+  }
+
+  // 2. Earnings & Financial Results
+  if (
+    lower.includes('quarter') ||
+    lower.includes('q1') ||
+    lower.includes('q2') ||
+    lower.includes('q3') ||
+    lower.includes('q4') ||
+    lower.includes('earnings') ||
+    lower.includes('net profit') ||
+    lower.includes('financial result')
+  ) {
+    return 'Earnings';
+  }
+
+  // 3. Deals & Contracts
+  if (
+    lower.includes('order win') ||
+    lower.includes('contract') ||
+    lower.includes('acquisition') ||
+    lower.includes('partnership') ||
+    lower.includes('joint venture') ||
+    lower.includes('bags order')
+  ) {
+    return 'Deal';
+  }
+
+  // 4. Analyst & Brokerage
+  if (
+    lower.includes('target price') ||
+    lower.includes('rating') ||
+    lower.includes('brokerage') ||
+    lower.includes('reiterates buy') ||
+    lower.includes('upgrade') ||
+    lower.includes('downgrade')
+  ) {
+    return 'Analyst';
+  }
+
+  // 5. Bearish sentiment indicators
+  if (
+    lower.includes('sink') ||
+    lower.includes('sinks') ||
+    lower.includes('slump') ||
+    lower.includes('slumps') ||
+    lower.includes('crash') ||
+    lower.includes('crashes') ||
+    lower.includes('plunge') ||
+    lower.includes('plunges') ||
+    lower.includes('tumble') ||
+    lower.includes('tumbles') ||
+    lower.includes('decline') ||
+    lower.includes('declines') ||
+    lower.includes('drop') ||
+    lower.includes('drops') ||
+    lower.includes('fall') ||
+    lower.includes('falls') ||
+    lower.includes('falling') ||
+    lower.includes('down') ||
+    lower.includes('52-week low') ||
+    lower.includes('lows') ||
+    lower.includes('bear') ||
+    lower.includes('loss') ||
+    lower.includes('losses') ||
+    lower.includes('weak') ||
+    lower.includes('weakness') ||
+    lower.includes('selloff')
+  ) {
+    return 'Bearish';
+  }
+
+  // 6. Bullish sentiment indicators
+  if (
+    lower.includes('surge') ||
+    lower.includes('surges') ||
+    lower.includes('jump') ||
+    lower.includes('jumps') ||
+    lower.includes('gain') ||
+    lower.includes('gains') ||
+    lower.includes('rally') ||
+    lower.includes('rallies') ||
+    lower.includes('bull') ||
+    lower.includes('52-week high') ||
+    lower.includes('record high') ||
+    lower.includes('upbeat') ||
+    lower.includes('soar') ||
+    lower.includes('soars')
+  ) {
+    return 'Bullish';
+  }
+
+  return 'General';
 }
 
 export const newsService = new NewsService();

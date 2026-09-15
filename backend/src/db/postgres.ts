@@ -39,7 +39,8 @@ const memoryStore = {
   watchlists: [
     { id: 'wl-core', user_id: 'demo-user', name: 'Nifty 50 Core', sort_order: 1, is_default: true, created_at: new Date(), updated_at: new Date() },
     { id: 'wl-tech', user_id: 'demo-user', name: 'IT & Banking Giants', sort_order: 2, is_default: false, created_at: new Date(), updated_at: new Date() },
-    { id: 'wl-growth', user_id: 'demo-user', name: 'High Growth & Tech', sort_order: 3, is_default: false, created_at: new Date(), updated_at: new Date() },
+    { id: 'wl-growth', user_id: 'demo-user', name: 'India High Growth & Fintech', sort_order: 3, is_default: false, created_at: new Date(), updated_at: new Date() },
+    { id: 'wl-us', user_id: 'demo-user', name: 'US Tech Titans', sort_order: 4, is_default: false, created_at: new Date(), updated_at: new Date() },
   ],
   watchlist_items: [
     // Nifty 50 Core (16 stocks with Honorary GROWW)
@@ -59,7 +60,7 @@ const memoryStore = {
     { id: 'wi-13', watchlist_id: 'wl-core', symbol: 'SUNPHARMA', sort_order: 13, added_at: new Date() },
     { id: 'wi-14', watchlist_id: 'wl-core', symbol: 'TITAN', sort_order: 14, added_at: new Date() },
     { id: 'wi-15', watchlist_id: 'wl-core', symbol: 'AXISBANK', sort_order: 15, added_at: new Date() },
-    // IT & Banking Giants (10 stocks)
+    // IT & Banking Giants (10 Indian stocks)
     { id: 'wi-16', watchlist_id: 'wl-tech', symbol: 'TCS', sort_order: 1, added_at: new Date() },
     { id: 'wi-17', watchlist_id: 'wl-tech', symbol: 'INFY', sort_order: 2, added_at: new Date() },
     { id: 'wi-18', watchlist_id: 'wl-tech', symbol: 'WIPRO', sort_order: 3, added_at: new Date() },
@@ -69,17 +70,25 @@ const memoryStore = {
     { id: 'wi-22', watchlist_id: 'wl-tech', symbol: 'SBIN', sort_order: 7, added_at: new Date() },
     { id: 'wi-23', watchlist_id: 'wl-tech', symbol: 'KOTAKBANK', sort_order: 8, added_at: new Date() },
     { id: 'wi-24', watchlist_id: 'wl-tech', symbol: 'AXISBANK', sort_order: 9, added_at: new Date() },
-    { id: 'wi-25', watchlist_id: 'wl-tech', symbol: 'WIT', sort_order: 10, added_at: new Date() },
-    // High Growth & Tech (9 stocks with Honorary GROWW)
+    { id: 'wi-25', watchlist_id: 'wl-tech', symbol: 'TECHM', sort_order: 10, added_at: new Date() },
+    // India High Growth & Fintech (9 Indian stocks with Honorary GROWW)
     { id: 'wi-growth-0', watchlist_id: 'wl-growth', symbol: 'GROWW', sort_order: 0, added_at: new Date() },
     { id: 'wi-26', watchlist_id: 'wl-growth', symbol: 'ZOMATO', sort_order: 1, added_at: new Date() },
     { id: 'wi-27', watchlist_id: 'wl-growth', symbol: 'PAYTM', sort_order: 2, added_at: new Date() },
     { id: 'wi-28', watchlist_id: 'wl-growth', symbol: 'JIOFIN', sort_order: 3, added_at: new Date() },
     { id: 'wi-29', watchlist_id: 'wl-growth', symbol: 'TATAMOTORS', sort_order: 4, added_at: new Date() },
-    { id: 'wi-30', watchlist_id: 'wl-growth', symbol: 'NVDA', sort_order: 5, added_at: new Date() },
-    { id: 'wi-31', watchlist_id: 'wl-growth', symbol: 'AAPL', sort_order: 6, added_at: new Date() },
-    { id: 'wi-32', watchlist_id: 'wl-growth', symbol: 'TSLA', sort_order: 7, added_at: new Date() },
-    { id: 'wi-33', watchlist_id: 'wl-growth', symbol: 'MSFT', sort_order: 8, added_at: new Date() },
+    { id: 'wi-30', watchlist_id: 'wl-growth', symbol: 'HAL', sort_order: 5, added_at: new Date() },
+    { id: 'wi-31', watchlist_id: 'wl-growth', symbol: 'BEL', sort_order: 6, added_at: new Date() },
+    { id: 'wi-32', watchlist_id: 'wl-growth', symbol: 'TRENT', sort_order: 7, added_at: new Date() },
+    { id: 'wi-33', watchlist_id: 'wl-growth', symbol: 'VBL', sort_order: 8, added_at: new Date() },
+    // US Tech Titans (7 US Equities)
+    { id: 'wi-us-1', watchlist_id: 'wl-us', symbol: 'NVDA', sort_order: 1, added_at: new Date() },
+    { id: 'wi-us-2', watchlist_id: 'wl-us', symbol: 'AAPL', sort_order: 2, added_at: new Date() },
+    { id: 'wi-us-3', watchlist_id: 'wl-us', symbol: 'MSFT', sort_order: 3, added_at: new Date() },
+    { id: 'wi-us-4', watchlist_id: 'wl-us', symbol: 'GOOGL', sort_order: 4, added_at: new Date() },
+    { id: 'wi-us-5', watchlist_id: 'wl-us', symbol: 'AMZN', sort_order: 5, added_at: new Date() },
+    { id: 'wi-us-6', watchlist_id: 'wl-us', symbol: 'TSLA', sort_order: 6, added_at: new Date() },
+    { id: 'wi-us-7', watchlist_id: 'wl-us', symbol: 'META', sort_order: 7, added_at: new Date() },
   ],
   market_ticks: [
     { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'GROWW', ltp: 200.00, volume: 31136422, high: 200.91, low: 192.60, open: 195.84, close: 195.84, bid: 199.80, ask: 200.20 },
@@ -469,7 +478,8 @@ export async function initPostgresSchema() {
         INSERT INTO watchlists (id, user_id, name, is_default, sort_order) VALUES
         ('wl-core', 'demo-user', 'Nifty 50 Core', TRUE, 1),
         ('wl-tech', 'demo-user', 'IT & Banking Giants', FALSE, 2),
-        ('wl-growth', 'demo-user', 'High Growth & Tech', FALSE, 3)
+        ('wl-growth', 'demo-user', 'India High Growth & Fintech', FALSE, 3),
+        ('wl-us', 'demo-user', 'US Tech Titans', FALSE, 4)
         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order;
 
         -- Seed Nifty 50 Core Items (With Honorary GROWW)
@@ -500,17 +510,25 @@ export async function initPostgresSchema() {
         ('wi-22', 'wl-tech', 'SBIN', 7),
         ('wi-23', 'wl-tech', 'KOTAKBANK', 8),
         ('wi-24', 'wl-tech', 'AXISBANK', 9),
-        ('wi-25', 'wl-tech', 'WIT', 10),
-        -- High Growth & Tech Items (With Honorary GROWW)
+        ('wi-25', 'wl-tech', 'TECHM', 10),
+        -- India High Growth & Fintech Items (With Honorary GROWW)
         ('wi-growth-0', 'wl-growth', 'GROWW', 0),
         ('wi-26', 'wl-growth', 'ZOMATO', 1),
         ('wi-27', 'wl-growth', 'PAYTM', 2),
         ('wi-28', 'wl-growth', 'JIOFIN', 3),
         ('wi-29', 'wl-growth', 'TATAMOTORS', 4),
-        ('wi-30', 'wl-growth', 'NVDA', 5),
-        ('wi-31', 'wl-growth', 'AAPL', 6),
-        ('wi-32', 'wl-growth', 'TSLA', 7),
-        ('wi-33', 'wl-growth', 'MSFT', 8)
+        ('wi-30', 'wl-growth', 'HAL', 5),
+        ('wi-31', 'wl-growth', 'BEL', 6),
+        ('wi-32', 'wl-growth', 'TRENT', 7),
+        ('wi-33', 'wl-growth', 'VBL', 8),
+        -- US Tech Titans Items
+        ('wi-us-1', 'wl-us', 'NVDA', 1),
+        ('wi-us-2', 'wl-us', 'AAPL', 2),
+        ('wi-us-3', 'wl-us', 'MSFT', 3),
+        ('wi-us-4', 'wl-us', 'GOOGL', 4),
+        ('wi-us-5', 'wl-us', 'AMZN', 5),
+        ('wi-us-6', 'wl-us', 'TSLA', 6),
+        ('wi-us-7', 'wl-us', 'META', 7)
         ON CONFLICT (watchlist_id, symbol) DO NOTHING;
 
         -- Seed Real Market Ticks (So database is never empty or dummy)

@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { TrendingUp, Activity, Zap, Layers, RotateCcw, Newspaper, Sparkles, AlertTriangle } from 'lucide-react';
+import { getCurrencySymbol } from '@/lib/formatters';
 
 interface Props {
   type?: string;
   signalType?: string;
   severity: number;
   description?: string;
+  symbol?: string;
   metadata?: Record<string, any>;
 }
 
@@ -38,7 +40,7 @@ const labelMap: Record<string, string> = {
   DEAD_CAT_BOUNCE: '⚠ Dead Cat Bounce',
 };
 
-export function SignalBadge({ type, signalType, severity, description, metadata }: Props) {
+export function SignalBadge({ type, signalType, severity, description, symbol, metadata }: Props) {
   const [showTooltip, setShowTooltip] = useState(false);
   const resolvedType = (type || signalType || '').trim();
   const label = labelMap[resolvedType] || (resolvedType ? resolvedType.replace(/_/g, ' ') : 'SIGNAL');
@@ -48,12 +50,15 @@ export function SignalBadge({ type, signalType, severity, description, metadata 
   let keyStats: StatItem[] = meta.keyStats || [];
   let rationale: string = meta.rationale || '';
 
+  const extractedSymbol = symbol || (description?.includes(':') ? description.split(':')[0].trim() : '');
+  const curr = getCurrencySymbol(extractedSymbol);
+
   if (keyStats.length === 0) {
     if (resolvedType === 'PRICE_BREAKOUT') {
       const gain = meta.gainPercent ?? 1.5;
       keyStats = [
         { label: 'Intraday Move', value: `${gain >= 0 ? '+' : ''}${gain}%` },
-        { label: 'Breakout Level', value: meta.high ? `₹${meta.high}` : 'Day High' },
+        { label: 'Breakout Level', value: meta.high ? `${curr}${meta.high}` : 'Day High' },
         { label: 'Order Flow', value: 'Buyer Squeeze' },
         { label: 'Confidence', value: `${severity}%` },
       ];
@@ -62,7 +67,7 @@ export function SignalBadge({ type, signalType, severity, description, metadata 
       const block = meta.estimatedTurnoverCr || meta.estimatedBlockCr || 25;
       const vol = meta.volumeRatio || 2.2;
       keyStats = [
-        { label: 'Traded Turnover', value: `₹${block} Cr` },
+        { label: 'Traded Turnover', value: curr === '$' ? `$${block}M` : `₹${block} Cr` },
         { label: 'Volume Surge', value: `${vol}x 20d Avg` },
         { label: 'Order Flow', value: 'Institutional Sweep' },
         { label: 'Confidence', value: `${severity}%` },
@@ -72,7 +77,7 @@ export function SignalBadge({ type, signalType, severity, description, metadata 
       const jump = meta.tickJumpPercent || 0.35;
       keyStats = [
         { label: 'Pivot Rebound', value: `+${jump}% Impulse` },
-        { label: 'Support Level', value: meta.lowPrice ? `₹${meta.lowPrice}` : 'Day Low' },
+        { label: 'Support Level', value: meta.lowPrice ? `${curr}${meta.lowPrice}` : 'Day Low' },
         { label: 'Order Flow', value: 'Short Covering' },
         { label: 'Confidence', value: `${severity}%` },
       ];
@@ -81,7 +86,7 @@ export function SignalBadge({ type, signalType, severity, description, metadata 
       const atrRatio = meta.atrRatio || 2.1;
       keyStats = [
         { label: 'ATR Multiple', value: `${atrRatio}x Normal` },
-        { label: '20-Day ATR', value: meta.atr20 ? `₹${meta.atr20}` : '₹35.00' },
+        { label: '20-Day ATR', value: meta.atr20 ? `${curr}${meta.atr20}` : curr === '$' ? '$2.50' : '₹35.00' },
         { label: 'Volatility State', value: 'Expansion Outlier' },
         { label: 'Confidence', value: `${severity}%` },
       ];

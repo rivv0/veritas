@@ -27,6 +27,9 @@ export function calculateVolatilitySignal(
         ? `${currTick.symbol}: High Volatility Move ${atrRatio}x 20-day ATR (${isUp ? '+' : '-'}${percentMove.toFixed(2)}%)`
         : `${currTick.symbol}: Rapid ${isUp ? 'upside' : 'downside'} volatility burst (+${tickJump.toFixed(2)}% tick)`;
 
+    const US_STOCKS = new Set(['NVDA', 'AAPL', 'MSFT', 'TSLA', 'GOOGL', 'AMZN', 'META', 'WIT']);
+    const currPrefix = US_STOCKS.has(currTick.symbol.toUpperCase()) ? '$' : '₹';
+
     return {
       id: `sig-${uuidv4().slice(0, 8)}`,
       symbol: currTick.symbol,
@@ -40,9 +43,9 @@ export function calculateVolatilitySignal(
         percentMove: Number(percentMove.toFixed(2)),
         tickJump: Number(tickJump.toFixed(2)),
         isUp,
-        rationale: `Intraday displacement of ₹${intradayMove.toFixed(2)} exceeds 20-day benchmark ATR (₹${atr20.toFixed(2)}) by ${atrRatio}x`,
+        rationale: `Intraday displacement of ${currPrefix}${intradayMove.toFixed(2)} exceeds 20-day benchmark ATR (${currPrefix}${atr20.toFixed(2)}) by ${atrRatio}x`,
         keyStats: [
-          { label: '20-Day ATR', value: `₹${atr20.toFixed(2)}` },
+          { label: '20-Day ATR', value: `${currPrefix}${atr20.toFixed(2)}` },
           { label: 'ATR Multiple', value: `${atrRatio}x Normal Range` },
           { label: 'Intraday Move', value: `${isUp ? '+' : '-'}${percentMove.toFixed(2)}%` },
           { label: 'Signal Type', value: atrRatio >= 2.5 ? 'Statistical Outlier' : 'High Volatility' },

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useId } from 'react';
 import { X, AlertTriangle, TrendingDown, TrendingUp, ShieldAlert, Activity, Layers, BarChart2 } from 'lucide-react';
 import type { MarketSnapshot, WsTick, WsSignal } from '@/lib/types';
 import { SignalBadge } from './SignalBadge';
+import { getCurrencySymbol } from '@/lib/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function StockChartModal({
 }: Props) {
   const gradientId = useId();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const curr = getCurrencySymbol(symbol || undefined);
   const [liveHistory, setLiveHistory] = useState<number[]>([]);
 
   const ltp = tick?.ltp ?? snapshot?.ltp ?? (symbol === 'GROWW' ? 200 : 100);
@@ -206,10 +208,10 @@ export function StockChartModal({
           <div className="flex items-center gap-4">
             <div className="text-right font-mono">
               <div className="text-xl font-bold text-white tracking-tight tabular-nums">
-                ₹{ltp.toFixed(2)}
+                {curr}{ltp.toFixed(2)}
               </div>
               <div className={`text-xs font-bold tabular-nums ${isBearish ? 'text-red-400' : isBullish ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                {changePercent > 0.001 ? '+' : ''}{changePercent.toFixed(2)}% (₹{change > 0.001 ? '+' : ''}{change.toFixed(2)})
+                {changePercent > 0.001 ? '+' : ''}{changePercent.toFixed(2)}% ({curr}{change > 0.001 ? '+' : ''}{change.toFixed(2)})
               </div>
             </div>
 
@@ -240,7 +242,7 @@ export function StockChartModal({
             </div>
 
             <p className="text-xs text-amber-200/90 leading-relaxed">
-              <strong>Caution to retail traders:</strong> The current upward rebound is a classic <em>Dead Cat Bounce</em>. The asset is in a dominant macro decline ({changePercent.toFixed(1)}%), remains capped below its 20-EMA resistance ceiling (₹{emaVal.toFixed(2)}), and lacks institutional buying volume. Do not mistake this temporary bounce for a genuine trend reversal.
+              <strong>Caution to retail traders:</strong> The current upward rebound is a classic <em>Dead Cat Bounce</em>. The asset is in a dominant macro decline ({changePercent.toFixed(1)}%), remains capped below its 20-EMA resistance ceiling ({curr}{emaVal.toFixed(2)}), and lacks institutional buying volume. Do not mistake this temporary bounce for a genuine trend reversal.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-amber-800/60 text-[10px]">
@@ -254,7 +256,7 @@ export function StockChartModal({
               </div>
               <div>
                 <span className="text-amber-400/80">20-EMA Ceiling:</span>{' '}
-                <strong className="text-amber-100">₹{emaVal.toFixed(2)}</strong>
+                <strong className="text-amber-100">{curr}{emaVal.toFixed(2)}</strong>
               </div>
               <div>
                 <span className="text-amber-400/80">Market Action:</span>{' '}
@@ -277,7 +279,7 @@ export function StockChartModal({
                 <span className="text-amber-300">20-EMA Resistance</span>
               </span>
             </span>
-            <span>Intraday Range: ₹{low.toFixed(2)} — ₹{high.toFixed(2)}</span>
+            <span>Intraday Range: {curr}{low.toFixed(2)} — {curr}{high.toFixed(2)}</span>
           </div>
 
           <div className="relative w-full overflow-hidden">
@@ -416,14 +418,14 @@ export function StockChartModal({
               <g transform={`translate(${chartWidth - paddingRight + 8}, 0)`}>
                 {/* Max Value Label */}
                 <text x="0" y={paddingTop + 3} fill="#71717a" fontSize="9" fontFamily="monospace">
-                  ₹{maxVal.toFixed(1)}
+                  {curr}{maxVal.toFixed(1)}
                 </text>
 
                 {/* 20-EMA Tag */}
                 <g transform={`translate(0, ${emaY})`}>
                   <rect x="-2" y="-8" width="56" height="15" fill="#451a03" stroke="#f59e0b" strokeWidth="0.8" />
                   <text x="3" y="3" fill="#fde68a" fontSize="8.5" fontFamily="monospace" fontWeight="bold">
-                    EMA ₹{emaVal.toFixed(1)}
+                    EMA {curr}{emaVal.toFixed(1)}
                   </text>
                 </g>
 
@@ -440,14 +442,14 @@ export function StockChartModal({
                       strokeWidth="1" 
                     />
                     <text x="3" y="3" fill="#ffffff" fontSize="9" fontFamily="monospace" fontWeight="bold">
-                      ₹{ltp.toFixed(1)}
+                      {curr}{ltp.toFixed(1)}
                     </text>
                   </g>
                 )}
 
                 {/* Min Value Label */}
                 <text x="0" y={chartHeight - paddingBottom} fill="#71717a" fontSize="9" fontFamily="monospace">
-                  ₹{minVal.toFixed(1)}
+                  {curr}{minVal.toFixed(1)}
                 </text>
               </g>
 
@@ -479,7 +481,7 @@ export function StockChartModal({
                 <g transform={`translate(${Math.min(chartWidth - 140, Math.max(paddingLeft, activePoint.x - 50))}, ${paddingTop - 12})`}>
                   <rect width="100" height="18" fill="#18181b" stroke="#3f3f46" strokeWidth="1" />
                   <text x="50" y="13" fill="#ffffff" fontSize="10" fontFamily="monospace" textAnchor="middle" fontWeight="bold">
-                    ₹{activePoint.val.toFixed(2)}
+                    {curr}{activePoint.val.toFixed(2)}
                   </text>
                 </g>
               )}
@@ -523,7 +525,7 @@ export function StockChartModal({
           <div className="bg-black border border-zinc-800 p-2">
             <div className="text-[10px] text-zinc-500 uppercase">Day Spread (H/L)</div>
             <div className="text-sm font-bold text-white mt-0.5">
-              ₹{(high - low).toFixed(2)} ({low > 0 ? (((high - low) / low) * 100).toFixed(1) : 0}%)
+              {curr}{(high - low).toFixed(2)} ({low > 0 ? (((high - low) / low) * 100).toFixed(1) : 0}%)
             </div>
           </div>
         </div>
@@ -533,13 +535,14 @@ export function StockChartModal({
           <div className="border-t border-zinc-800 pt-3 space-y-1.5 font-mono">
             <div className="text-[10px] text-zinc-400 uppercase tracking-wider">Active Alerts & Telemetry</div>
             <div className="flex flex-wrap gap-1.5">
-              {signals.map((s, idx) => (
+              {signals.map((sig, idx) => (
                 <SignalBadge
-                  key={idx}
-                  type={s.signalType}
-                  severity={s.severity}
-                  description={s.description}
-                  metadata={s.metadata}
+                  key={sig.id || `${sig.symbol}-${sig.signalType || sig.type}-${idx}`}
+                  type={sig.signalType || sig.type}
+                  severity={sig.severity}
+                  description={sig.description}
+                  symbol={symbol || undefined}
+                  metadata={sig.metadata}
                 />
               ))}
             </div>

@@ -12,11 +12,12 @@ export class SignalEngine {
   private lastTicks: Map<string, Tick> = new Map();
   private base20dVolumes: Map<string, number> = new Map();
 
-  // Cooldown tracker to eliminate any signal spamming
+  // Cooldown & Deduplication tracker to eliminate any signal spamming or static-market repeats
   private globalLastSignalTime = 0;
   private globalCooldownMs = 40 * 1000; // at most 1 signal for the ENTIRE system every 40s
   private lastSignalBySymbol: Map<string, number> = new Map(); // at most 1 signal per symbol every 3 minutes
   private symbolCooldownMs = 3 * 60 * 1000;
+  private lastEmittedBySymbolType: Map<string, { price: number; timestamp: number; signature: string }> = new Map();
 
   async processTick(tick: Tick): Promise<Signal[]> {
     const rawSignals: Signal[] = [];
@@ -103,7 +104,7 @@ export class SignalEngine {
     }
 
     // Filter by strict global cooldown and symbol cooldown
-    const now = Date.now();
+    const now = tick.timestamp ? new Date(tick.timestamp).getTime() : Date.now();
     if (now - this.globalLastSignalTime < this.globalCooldownMs) {
       // System emitted a signal recently, hold fire to prevent spam
       return [];
@@ -112,14 +113,36 @@ export class SignalEngine {
     const approvedSignals: Signal[] = [];
 
     for (const signal of rawSignals) {
+      // 1. Symbol cooldown check: at least 3 minutes between signals for the same symbol
       const lastSymbolTime = this.lastSignalBySymbol.get(signal.symbol) || 0;
       if (now - lastSymbolTime < this.symbolCooldownMs) {
         continue; // Symbol has a recent active signal
       }
 
+      // 2. Exact Deduplication Check: if market is static and price has not moved, suppress repeat emission
+      const dedupeKey = `${signal.symbol}:${signal.signalType}`;
+      const lastEmitted = this.lastEmittedBySymbolType.get(dedupeKey);
+      if (lastEmitted) {
+        const priceMovePercent = lastEmitted.price > 0
+          ? Math.abs(tick.ltp - lastEmitted.price) / lastEmitted.price
+          : 0;
+        const priceMoveAbs = Math.abs(tick.ltp - lastEmitted.price);
+        const signature = `${signal.severity}:${signal.description}`;
+
+        // Suppress re-fire if price hasn't shifted by at least 0.15% (or >= 0.05 pts) AND signature is identical
+        if (priceMovePercent < 0.0015 && priceMoveAbs < 0.05 && signature === lastEmitted.signature) {
+          continue;
+        }
+      }
+
       // Record approvals
       this.globalLastSignalTime = now;
       this.lastSignalBySymbol.set(signal.symbol, now);
+      this.lastEmittedBySymbolType.set(dedupeKey, {
+        price: tick.ltp,
+        timestamp: now,
+        signature: `${signal.severity}:${signal.description}`,
+      });
       approvedSignals.push(signal);
 
       // Persist approved signal to database

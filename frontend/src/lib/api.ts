@@ -87,7 +87,7 @@ export async function removeSymbol(watchlistId: string, symbol: string) {
 }
 
 export async function fetchDigest(watchlistId: string, lookbackMinutes?: number) {
-  const query = lookbackMinutes ? `?lookback=${lookbackMinutes}` : '';
+  const query = lookbackMinutes ? `?lookbackMinutes=${lookbackMinutes}&lookback=${lookbackMinutes}` : '';
   const res = await fetch(`${API_BASE}/api/v1/watchlists/${watchlistId}/digest${query}`, {
     headers: getAuthHeaders(),
   });

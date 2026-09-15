@@ -5,15 +5,27 @@ import { signalService } from './signalService';
 import { computeAttentionScore } from '../signal/attention';
 import { calculateMarketStructure } from '../signal/marketStructure';
 import { WatchlistDigest, DigestItem } from '../domain/types';
+import { yahooClient } from '../marketdata/yahooClient';
 
 export class DigestService {
-  async generateDigest(userId: string, deviceFp: string, watchlistId?: string): Promise<WatchlistDigest> {
-    // 1. Honest baseline timestamp: accurately reflects the user's actual last visit
-    const session = await sessionRepository.getSession(userId, deviceFp);
+  async generateDigest(
+    userId: string,
+    deviceFp: string,
+    watchlistId?: string,
+    lookbackMinutes?: number
+  ): Promise<WatchlistDigest> {
     const now = Date.now();
-    const since = session && session.lastSeenAt
-      ? new Date(session.lastSeenAt)
-      : new Date(now - 30 * 60 * 1000);
+    let since: Date;
+    const session = await sessionRepository.getSession(userId, deviceFp);
+
+    if (typeof lookbackMinutes === 'number' && !isNaN(lookbackMinutes) && lookbackMinutes > 0) {
+      since = new Date(now - lookbackMinutes * 60 * 1000);
+    } else {
+      // 1. Honest baseline timestamp: accurately reflects the user's actual last visit
+      since = session && session.lastSeenAt
+        ? new Date(session.lastSeenAt)
+        : new Date(now - 30 * 60 * 1000);
+    }
 
     // 2. Fetch target watchlist
     const watchlists = await watchlistRepository.findByUserId(userId);
@@ -89,9 +101,17 @@ export class DigestService {
 
       const minutesAgo = Math.max(1, Math.round((now - since.getTime()) / (60 * 1000)));
 
-      // True historical price trajectory strictly queried from persisted TimescaleDB ticks
+      // True historical price trajectory queried from persisted TimescaleDB ticks or Yahoo 1m candles
       const recentPrices = await tickRepository.getRecentPrices(symbol, 20);
-      const sparkline = recentPrices.length >= 2 ? recentPrices : [previousPrice, currentTick.ltp];
+      let sparkline = recentPrices;
+      if (sparkline.length < 6) {
+        const liveQuote = await yahooClient.fetchQuote(symbol);
+        if (liveQuote?.sparkline && liveQuote.sparkline.length >= 6) {
+          sparkline = liveQuote.sparkline;
+        } else {
+          sparkline = sparkline.length >= 2 ? sparkline : [previousPrice, currentTick.ltp];
+        }
+      }
       const structure = calculateMarketStructure(
         symbol,
         currentTick.ltp,
