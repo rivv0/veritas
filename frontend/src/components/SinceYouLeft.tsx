@@ -44,17 +44,24 @@ function DigestCard({ item }: { item: DigestItem }) {
           )}
 
           {/* Sentiment Badge */}
-          {struct?.sentiment && (
-            <span className={`px-1 py-0.2 rounded-none text-[8px] font-mono font-bold uppercase flex items-center gap-0.5 ${
-              struct.sentiment === 'BULLISH' 
-                ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
-                : struct.sentiment === 'BEARISH'
-                ? 'bg-red-950/80 text-red-300 border border-red-800/80'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
-            }`}>
-              {struct.sentiment === 'BULLISH' ? '▲' : struct.sentiment === 'BEARISH' ? '▼' : '■'} {struct.sentiment}
-            </span>
-          )}
+          {struct?.sentiment && (() => {
+            const displaySentiment = item.percentChange > 0.001
+              ? (struct.sentiment === 'BULLISH' ? 'BULLISH' : 'NEUTRAL')
+              : item.percentChange < -0.001
+              ? (struct.sentiment === 'BEARISH' ? 'BEARISH' : 'NEUTRAL')
+              : struct.sentiment;
+            return (
+              <span className={`px-1 py-0.2 rounded-none text-[8px] font-mono font-bold uppercase flex items-center gap-0.5 ${
+                displaySentiment === 'BULLISH' 
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
+                  : displaySentiment === 'BEARISH'
+                  ? 'bg-red-950/80 text-red-300 border border-red-800/80'
+                  : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+              }`}>
+                {displaySentiment === 'BULLISH' ? '▲' : displaySentiment === 'BEARISH' ? '▼' : '■'} {displaySentiment}
+              </span>
+            );
+          })()}
 
           {/* Event Suffix */}
           {struct?.eventSuffix && (

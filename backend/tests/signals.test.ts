@@ -160,6 +160,24 @@ describe('Signal Engine Modules Verification', () => {
       expect(structure.rsi).not.toBe(50.0);
       expect(structure.rsi).toBeGreaterThan(50.0); // +2.12% session gain should show momentum > 50
     });
+
+    it('guarantees positive stocks are NEVER classified as BEARISH or Dead Cat Bounce', () => {
+      // Stock is up +0.8%, but currently trading slightly below a descending 20-EMA
+      const sparkline = [105, 104, 103, 102, 101.5, 101, 100.8];
+      const structure = calculateMarketStructure(
+        'INFY',
+        100.8,
+        0.80, // +0.80% positive day gain
+        sparkline,
+        105.0, // high
+        99.5   // low
+      );
+
+      // Must NEVER be BEARISH when day change is positive
+      expect(structure.sentiment).not.toBe('BEARISH');
+      expect(['BULLISH', 'NEUTRAL']).toContain(structure.sentiment);
+      expect(structure.isDeadCatBounce).toBe(false);
+    });
   });
 
   describe('Static Market Signal Deduplication', () => {

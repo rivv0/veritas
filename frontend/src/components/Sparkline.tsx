@@ -72,22 +72,27 @@ export function Sparkline({
 
   const strokeColor = useMemo(() => {
     if (isDeadCatBounce) return '#f59e0b'; // Amber warning
-    if (sentiment === 'BEARISH') return '#f87171'; // Red
+
+    // 1. Session price displacement: if stock is UP (isPositive === true), it is ALWAYS Green.
+    // If stock is DOWN (isPositive === false), it is ALWAYS Red.
+    if (isPositive === true) return '#34d399'; // Green
     if (isPositive === false) return '#f87171'; // Red
 
+    // 2. Market structure sentiment fallback if isPositive is undefined
+    if (sentiment === 'BULLISH') return '#34d399'; // Green
+    if (sentiment === 'BEARISH') return '#f87171'; // Red
+
+    // 3. Intraday sparkline trajectory fallback
     if (data && data.length >= 2) {
       const first = data[0];
       const last = data[data.length - 1];
-      if (last < first - 0.001) return '#f87171'; // Red downward slope
       if (last > first + 0.001) return '#34d399'; // Green upward slope
+      if (last < first - 0.001) return '#f87171'; // Red downward slope
     }
 
-    if (sentiment === 'BULLISH') return '#34d399'; // Green
-    if (isPositive === true) return '#34d399'; // Green
-
-    // Flat / Unchanged / Neutral is ZINC GRAY, NEVER GREEN!
+    // Flat / Unchanged / Neutral is ZINC GRAY
     return '#71717a';
-  }, [isDeadCatBounce, sentiment, isPositive, data]);
+  }, [isDeadCatBounce, isPositive, sentiment, data]);
 
   return (
     <svg width={width} height={height} className="overflow-visible select-none shrink-0">

@@ -150,17 +150,26 @@ export function StockChartModal({
   if (!isOpen || !symbol) return null;
 
   const activePoint = hoverIndex !== null && coords[hoverIndex] ? coords[hoverIndex] : lastPoint;
-  const isNetDown = chartData.length >= 2 ? chartData[chartData.length - 1] < chartData[0] : false;
-  const isBearish = struct?.sentiment === 'BEARISH' || changePercent < -0.001 || isNetDown;
-  const isBullish = struct?.sentiment === 'BULLISH' || (changePercent > 0.001 && !isBearish);
+  
+  const isNetPositive = changePercent > 0.001;
+  const isNetNegative = changePercent < -0.001;
 
-  const strokeColor = isDcb
+  const isBearish = isNetNegative;
+  const isBullish = isNetPositive;
+
+  const displaySentiment = isNetPositive
+    ? (struct?.sentiment === 'BULLISH' ? 'BULLISH' : 'NEUTRAL')
+    : isNetNegative
+    ? (struct?.sentiment === 'BEARISH' ? 'BEARISH' : 'NEUTRAL')
+    : (struct?.sentiment || 'NEUTRAL');
+
+  const strokeColor = (isDcb && isNetNegative)
     ? '#f59e0b'
-    : isBearish
-    ? '#f87171'
-    : isBullish
+    : isNetPositive
     ? '#34d399'
-    : '#a1a1aa';
+    : isNetNegative
+    ? '#f87171'
+    : '#71717a';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
@@ -181,15 +190,15 @@ export function StockChartModal({
                   {struct.tier}
                 </span>
               )}
-              {struct?.sentiment && (
+              {displaySentiment && (
                 <span className={`px-1.5 py-0.5 rounded-none text-[9px] font-mono font-bold uppercase flex items-center gap-1 ${
-                  struct.sentiment === 'BULLISH'
+                  displaySentiment === 'BULLISH'
                     ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
-                    : struct.sentiment === 'BEARISH'
+                    : displaySentiment === 'BEARISH'
                     ? 'bg-red-950/80 text-red-300 border border-red-800'
                     : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
                 }`}>
-                  {struct.sentiment === 'BULLISH' ? '▲' : struct.sentiment === 'BEARISH' ? '▼' : '■'} {struct.sentiment}
+                  {displaySentiment === 'BULLISH' ? '▲' : displaySentiment === 'BEARISH' ? '▼' : '■'} {displaySentiment}
                 </span>
               )}
               {struct?.eventSuffix && (
@@ -210,7 +219,7 @@ export function StockChartModal({
               <div className="text-xl font-bold text-white tracking-tight tabular-nums">
                 {curr}{ltp.toFixed(2)}
               </div>
-              <div className={`text-xs font-bold tabular-nums ${isBearish ? 'text-red-400' : isBullish ? 'text-emerald-400' : 'text-zinc-400'}`}>
+              <div className={`text-xs font-bold tabular-nums ${isNetPositive ? 'text-emerald-400' : isNetNegative ? 'text-red-400' : 'text-zinc-400'}`}>
                 {changePercent > 0.001 ? '+' : ''}{changePercent.toFixed(2)}% ({curr}{change > 0.001 ? '+' : ''}{change.toFixed(2)})
               </div>
             </div>
@@ -225,7 +234,7 @@ export function StockChartModal({
         </div>
 
         {/* DEAD CAT BOUNCE VISUAL WARNING BANNER */}
-        {isDcb && (
+        {isDcb && isNetNegative && (
           <div className="bg-amber-950/50 border border-amber-500/80 p-3 space-y-2 font-mono animate-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
@@ -331,7 +340,7 @@ export function StockChartModal({
               />
 
               {/* DEAD CAT BOUNCE RESISTANCE CORRIDOR SHADING */}
-              {isDcb && (
+              {isDcb && isNetNegative && (
                 <rect
                   x={paddingLeft}
                   y={emaY}

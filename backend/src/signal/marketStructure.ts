@@ -120,37 +120,44 @@ export function calculateMarketStructure(
     rsiState = 'OVERSOLD';
   }
 
-  // 4. Sentiment synthesis
+  // 4. Sentiment synthesis: strictly aligned with price direction (positive = BULLISH/NEUTRAL, negative = BEARISH/NEUTRAL)
   let sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
   if (changePercent >= 0.25) {
-    if (emaState === 'ABOVE_EMA' || rsi >= 55) {
+    if (emaState === 'ABOVE_EMA' || rsi >= 50) {
       sentiment = 'BULLISH';
     } else {
       sentiment = 'NEUTRAL';
     }
   } else if (changePercent <= -0.25) {
-    if (emaState === 'BELOW_EMA' || rsi <= 45) {
+    if (emaState === 'BELOW_EMA' || rsi <= 50) {
+      sentiment = 'BEARISH';
+    } else {
+      sentiment = 'NEUTRAL';
+    }
+  } else if (changePercent > 0.05) {
+    // Slight positive: can be BULLISH or NEUTRAL, never BEARISH
+    if (emaState === 'ABOVE_EMA' && rsi >= 52) {
+      sentiment = 'BULLISH';
+    } else {
+      sentiment = 'NEUTRAL';
+    }
+  } else if (changePercent < -0.05) {
+    // Slight negative: can be BEARISH or NEUTRAL, never BULLISH
+    if (emaState === 'BELOW_EMA' && rsi <= 48) {
       sentiment = 'BEARISH';
     } else {
       sentiment = 'NEUTRAL';
     }
   } else {
-    // Rangebound / close to flat
-    if (emaState === 'ABOVE_EMA' && rsi >= 58) {
-      sentiment = 'BULLISH';
-    } else if (emaState === 'BELOW_EMA' && rsi <= 42) {
-      sentiment = 'BEARISH';
-    } else {
-      sentiment = 'NEUTRAL';
-    }
+    sentiment = 'NEUTRAL';
   }
 
   // 5. Dead Cat Bounce (DCB) Detection
-  // Criteria: Severe prior drawdown (changePercent <= -1.2% or high-drawdown >= 2.0%),
+  // Criteria: Session MUST be negative (changePercent <= -1.2%),
   // minor weak bounce off intraday trough (>=0.10% from low and <=2.2%), firmly below 20-EMA, weak RSI (<=48)
   const effectiveLow = dayLow || (ltp * 0.985);
   const bounceFromLow = effectiveLow > 0 ? ((ltp - effectiveLow) / effectiveLow) * 100 : 0;
-  const isDrawdownSevere = changePercent <= -1.2 || (dayHigh ? ((dayHigh - ltp) / dayHigh) >= 0.02 : false);
+  const isDrawdownSevere = changePercent <= -1.2;
   const isWeakBounce = bounceFromLow >= 0.10 && bounceFromLow <= 2.2;
   const isFirmlyBelowEma = emaState === 'BELOW_EMA' || emaState === 'EMA_CROSS' || ltp <= ema20 * 1.002;
 

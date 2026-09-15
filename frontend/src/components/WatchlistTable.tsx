@@ -418,7 +418,10 @@ export function WatchlistTable({
                   ? ((tick.ltp - tick.close) / tick.close) * 100
                   : fallbackChange;
 
-              const isRowBearish = struct?.sentiment === 'BEARISH' || struct?.emaState === 'BELOW_EMA' || liveChange < -0.001;
+              const isRowPositive = liveChange > 0.001;
+              const isRowNegative = liveChange < -0.001;
+              const isRowBearish = isRowNegative || (Math.abs(liveChange) <= 0.001 && struct?.sentiment === 'BEARISH');
+              const isRowBullish = isRowPositive || (Math.abs(liveChange) <= 0.001 && struct?.sentiment === 'BULLISH');
 
               return (
                 <tr
@@ -469,9 +472,21 @@ export function WatchlistTable({
                       {/* Sentiment arrow */}
                       {struct?.sentiment && (
                         <span className={`text-[9px] font-bold ${
-                          struct.sentiment === 'BULLISH' ? 'text-emerald-400' : struct.sentiment === 'BEARISH' ? 'text-red-400' : 'text-zinc-500'
+                          isRowPositive
+                            ? 'text-emerald-400'
+                            : isRowNegative
+                            ? 'text-red-400'
+                            : struct.sentiment === 'BULLISH'
+                            ? 'text-emerald-400'
+                            : struct.sentiment === 'BEARISH'
+                            ? 'text-red-400'
+                            : 'text-zinc-500'
                         }`}>
-                          {struct.sentiment === 'BULLISH' ? '▲' : struct.sentiment === 'BEARISH' ? '▼' : '■'}
+                          {isRowPositive
+                            ? (struct.sentiment === 'BULLISH' ? '▲' : '■')
+                            : isRowNegative
+                            ? (struct.sentiment === 'BEARISH' ? '▼' : '■')
+                            : (struct.sentiment === 'BULLISH' ? '▲' : struct.sentiment === 'BEARISH' ? '▼' : '■')}
                         </span>
                       )}
 
@@ -516,13 +531,13 @@ export function WatchlistTable({
                     >
                       <Sparkline
                         data={currentSparkline}
-                        isPositive={!isRowBearish && liveChange > 0.001}
-                        sentiment={isRowBearish ? 'BEARISH' : struct?.sentiment}
-                        isDeadCatBounce={struct?.isDeadCatBounce}
+                        isPositive={isRowPositive ? true : isRowNegative ? false : undefined}
+                        sentiment={isRowPositive ? (struct?.sentiment === 'BULLISH' ? 'BULLISH' : 'NEUTRAL') : struct?.sentiment}
+                        isDeadCatBounce={struct?.isDeadCatBounce && isRowNegative}
                         width={90}
                         height={24}
                       />
-                      {struct?.isDeadCatBounce ? (
+                      {struct?.isDeadCatBounce && isRowNegative ? (
                         <span className="mt-1 px-1 py-0.2 bg-amber-500/20 text-amber-400 border border-amber-500/60 text-[8px] font-mono font-bold uppercase tracking-wider flex items-center gap-0.5 group-hover/chart:bg-amber-500/30 animate-pulse">
                           ⚠ DEAD CAT BOUNCE
                         </span>
