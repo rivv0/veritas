@@ -178,9 +178,19 @@ export class MarketDataService {
       this.startFallbackSimulator();
     }
 
-    // 1. Immediate real market candle sync & true 20-day volume history sync
-    this.syncRealQuotes().catch(console.error);
-    this.syncSymbolStats().catch(console.error);
+    // 1. Initial real market sync followed by 20-day volume history sync (sequenced to prevent Yahoo burst)
+    (async () => {
+      try {
+        await this.syncRealQuotes();
+      } catch (err) {
+        console.error('[MarketDataService] Initial syncRealQuotes error:', err);
+      }
+      try {
+        await this.syncSymbolStats();
+      } catch (err) {
+        console.error('[MarketDataService] Initial syncSymbolStats error:', err);
+      }
+    })();
 
     // 2. Continuous real market polling cycle (every 15s for high-resolution candle updates)
     this.realSyncTimer = setInterval(() => {

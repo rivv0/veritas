@@ -11,14 +11,13 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-];
+interface YahooSession {
+  cookie: string;
+  crumb: string;
+  expiresAt: number;
+}
 
+const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 const US_EQUITIES = new Set(['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META', 'WIT']);
 const SYMBOL_MAP: Record<string, string> = {
   GROWW: 'ANGELONE.NS',
@@ -32,17 +31,72 @@ export class YahooClient {
   private avgVolCache: Map<string, { value: number; expiresAt: number }> = new Map();
   private throttleQueue: Promise<void> = Promise.resolve();
   private minIntervalMs = 500; // Paced between Yahoo calls to completely avoid 429 rate limits
-  private uaIndex = 0;
   private rateLimitedUntil = 0;
+
+  private session: YahooSession | null = null;
+  private sessionPromise: Promise<YahooSession | null> | null = null;
 
   isRateLimited(): boolean {
     return Date.now() < this.rateLimitedUntil;
   }
 
-  private getNextUserAgent(): string {
-    const ua = USER_AGENTS[this.uaIndex % USER_AGENTS.length];
-    this.uaIndex++;
-    return ua;
+  private async getSession(): Promise<YahooSession | null> {
+    if (this.session && this.session.expiresAt > Date.now()) {
+      return this.session;
+    }
+    if (this.sessionPromise) {
+      return this.sessionPromise;
+    }
+
+    this.sessionPromise = (async () => {
+      try {
+        const cookieRes = await fetch('https://fc.yahoo.com', {
+          headers: { 'User-Agent': DEFAULT_UA },
+          signal: AbortSignal.timeout(6000),
+        });
+        const rawCookie = cookieRes.headers.get('set-cookie');
+        if (!rawCookie) {
+          console.warn('[Yahoo] No set-cookie header returned from fc.yahoo.com');
+          return null;
+        }
+        const cookie = rawCookie.split(';')[0];
+
+        for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+          try {
+            const crumbRes = await fetch(`https://${host}/v1/test/getcrumb`, {
+              headers: {
+                'User-Agent': DEFAULT_UA,
+                Cookie: cookie,
+              },
+              signal: AbortSignal.timeout(6000),
+            });
+            if (crumbRes.ok) {
+              const crumb = (await crumbRes.text()).trim();
+              if (crumb && !crumb.includes('<') && crumb !== 'Too Many Requests') {
+                console.log(`[Yahoo] Session established with ${host} (authenticated with crumb)`);
+                this.session = {
+                  cookie,
+                  crumb,
+                  expiresAt: Date.now() + 6 * 60 * 60 * 1000, // 6 hours validity
+                };
+                return this.session;
+              }
+            }
+          } catch (err: any) {
+            console.warn(`[Yahoo] Failed to get crumb from ${host}:`, err.message || err);
+          }
+        }
+        console.warn('[Yahoo] Could not acquire crumb token');
+        return null;
+      } catch (err: any) {
+        console.error('[Yahoo] Session initialization error:', err.message || err);
+        return null;
+      } finally {
+        this.sessionPromise = null;
+      }
+    })();
+
+    return this.sessionPromise;
   }
 
   private getYahooTicker(symbol: string): string {
@@ -72,26 +126,36 @@ export class YahooClient {
     }
 
     const ticker = this.getYahooTicker(cleanSym);
+    const session = await this.getSession();
+    const crumbParam = session ? `&crumb=${encodeURIComponent(session.crumb)}` : '';
+    const headers: Record<string, string> = {
+      'User-Agent': DEFAULT_UA,
+      Accept: 'application/json',
+    };
+    if (session) {
+      headers['Cookie'] = session.cookie;
+    }
 
     for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
       try {
         await this.throttle();
         const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
           ticker
-        )}?interval=1m&range=1d`;
-        
+        )}?interval=1m&range=1d${crumbParam}`;
+
         const response = await fetch(url, {
-          headers: {
-            'User-Agent': this.getNextUserAgent(),
-            Accept: 'application/json',
-          },
+          headers,
           signal: AbortSignal.timeout(8000),
         });
 
         if (!response.ok) {
           if (response.status === 429) {
             console.warn(`[Yahoo] 429 Too Many Requests from ${host} for ${ticker}`);
+            this.session = null; // Invalidate session to refresh cookie/crumb on next cycle
             continue;
+          }
+          if (response.status === 401 || response.status === 403) {
+            this.session = null;
           }
           console.error(`[Yahoo] ${ticker} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
           continue;
@@ -171,26 +235,36 @@ export class YahooClient {
     }
 
     const ticker = this.getYahooTicker(cleanSym);
+    const session = await this.getSession();
+    const crumbParam = session ? `&crumb=${encodeURIComponent(session.crumb)}` : '';
+    const headers: Record<string, string> = {
+      'User-Agent': DEFAULT_UA,
+      Accept: 'application/json',
+    };
+    if (session) {
+      headers['Cookie'] = session.cookie;
+    }
 
     for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
       try {
         await this.throttle();
         const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
           ticker
-        )}?interval=1d&range=1mo`;
+        )}?interval=1d&range=1mo${crumbParam}`;
 
         const response = await fetch(url, {
-          headers: {
-            'User-Agent': this.getNextUserAgent(),
-            Accept: 'application/json',
-          },
+          headers,
           signal: AbortSignal.timeout(8000),
         });
 
         if (!response.ok) {
           if (response.status === 429) {
             console.warn(`[Yahoo-Stats] 429 Too Many Requests from ${host} for ${ticker}`);
+            this.session = null;
             continue;
+          }
+          if (response.status === 401 || response.status === 403) {
+            this.session = null;
           }
           console.error(`[Yahoo-Stats] ${ticker} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
           continue;
