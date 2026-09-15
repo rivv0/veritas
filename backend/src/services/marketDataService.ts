@@ -14,6 +14,7 @@ export class MarketDataService {
   private realSyncTimer: NodeJS.Timeout | null = null;
   private statsSyncTimer: NodeJS.Timeout | null = null;
   private trackedSymbols: Set<string> = new Set(config.market.symbols);
+  private cycleCount = 0;
 
   async refreshTrackedSymbols() {
     try {
@@ -26,14 +27,17 @@ export class MarketDataService {
   }
 
   async syncRealQuotes() {
+    this.cycleCount++;
     await this.refreshTrackedSymbols();
     const symbols = Array.from(this.trackedSymbols);
     let realTicksCount = 0;
+    let nullCount = 0;
 
     for (const symbol of symbols) {
       try {
         const liveCandle = await yfCandleClient.fetchLatest(symbol);
         if (!liveCandle) {
+          nullCount++;
           if (!yahooClient.isRateLimited()) {
             console.warn(`[MarketData] No data for ${symbol}`);
           }
@@ -67,7 +71,7 @@ export class MarketDataService {
 
         try {
           await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
-        } catch (e) {}
+        } catch (e) { }
 
         wsManager.broadcastToSymbol(symbol, tickPayload);
 
@@ -86,7 +90,7 @@ export class MarketDataService {
 
           try {
             await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
-          } catch (e) {}
+          } catch (e) { }
 
           wsManager.broadcastToSymbol(symbol, signalPayload);
         }
@@ -94,11 +98,19 @@ export class MarketDataService {
         console.error(`[MarketData] Error syncing quote for ${symbol}:`, err.message || err);
       }
     }
+
+    // Heartbeat: log once every cycle so Render logs prove the loop is alive
+    console.log(
+      `[MarketData] cycle #${this.cycleCount} | symbols=${symbols.length} ` +
+      `success=${realTicksCount} null=${nullCount} ` +
+      `rateLimited=${yahooClient.isRateLimited()}`
+    );
   }
 
   async syncSymbolStats() {
     await this.refreshTrackedSymbols();
     const symbols = Array.from(this.trackedSymbols);
+    let updated = 0;
     for (const symbol of symbols) {
       try {
         const avgVol = await yahooClient.fetch20DayAvgVolume(symbol);
@@ -109,11 +121,13 @@ export class MarketDataService {
             ON CONFLICT (symbol) DO UPDATE SET avg_volume_20d = EXCLUDED.avg_volume_20d, updated_at = NOW()
           `;
           await query(sql, [symbol, avgVol]);
+          updated++;
         }
       } catch (err) {
         // Continue to next symbol
       }
     }
+    console.log(`[MarketData] syncSymbolStats complete | updated=${updated}/${symbols.length}`);
   }
 
   startFallbackSimulator() {
@@ -145,7 +159,7 @@ export class MarketDataService {
           };
           try {
             await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
-          } catch (e) {}
+          } catch (e) { }
           wsManager.broadcastToSymbol(symbol, tickPayload);
 
           const signals = await signalEngine.processTick(tick);
@@ -161,10 +175,10 @@ export class MarketDataService {
             };
             try {
               await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
-            } catch (e) {}
+            } catch (e) { }
             wsManager.broadcastToSymbol(symbol, signalPayload);
           }
-        } catch (err) {}
+        } catch (err) { }
       }
     }, config.market.tickIntervalMs || 2000);
   }
@@ -211,6 +225,10 @@ export class MarketDataService {
     if (this.realSyncTimer) {
       clearInterval(this.realSyncTimer);
       this.realSyncTimer = null;
+    }
+    if (this.statsSyncTimer) {
+      clearInterval(this.statsSyncTimer);
+      this.statsSyncTimer = null;
     }
   }
 }

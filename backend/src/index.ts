@@ -40,19 +40,47 @@ import { initPostgresSchema } from './db/postgres';
 // Initialize WebSocket server
 wsManager.init(server);
 
+/** Race an async task against a timeout so boot never hangs */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | 'timeout'> {
+  return Promise.race([
+    promise.then((v) => v as T),
+    new Promise<'timeout'>((_, reject) =>
+      setTimeout(() => {
+        console.warn(`[BOOT] ${label} timed out after ${ms}ms — continuing without it`);
+        reject('timeout');
+      }, ms)
+    ),
+  ]).catch((err) => {
+    if (err === 'timeout') return 'timeout' as const;
+    throw err;
+  });
+}
+
 // Start HTTP & WebSocket server
 server.listen(config.port, async () => {
-  console.log(`Smart Watchlist Backend API listening on port ${config.port}`);
-  console.log(`WebSocket server endpoint: ws://localhost:${config.port}/ws/v1/market`);
+  console.log(`[BOOT] Smart Watchlist Backend API listening on port ${config.port}`);
+  console.log(`[BOOT] WebSocket server endpoint: ws://localhost:${config.port}/ws/v1/market`);
 
-  // Initialize remote database schema if configured
-  await initPostgresSchema();
+  // Initialize remote database schema if configured — but NEVER let it block the streamer
+  const schemaResult = await withTimeout(initPostgresSchema(), 10_000, 'Postgres schema init').catch(
+    (err) => {
+      console.error('[BOOT] Postgres init failed:', err.message || err);
+      return 'timeout' as const;
+    }
+  );
 
-  // Start market tick streaming loop
+  if (schemaResult === 'timeout') {
+    console.log('[BOOT] Proceeding in In-Memory mode (Postgres unreachable)');
+  }
+
+  // Start market tick streaming loop — guaranteed to run
+  console.log('[BOOT] Kicking off market data streamer...');
   marketDataService.startTickStream();
+  console.log('[BOOT] Market data streamer started');
 });
 
 const shutdown = () => {
+  console.log('[BOOT] SIGTERM/SIGINT received — shutting down gracefully');
   marketDataService.stopTickStream();
   server.close(() => {
     process.exit(0);
@@ -61,4 +89,3 @@ const shutdown = () => {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
-
