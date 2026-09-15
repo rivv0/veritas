@@ -74,7 +74,10 @@ export class YahooClient {
             signal: AbortSignal.timeout(8000),
           });
 
-        if (!response.ok) continue;
+          if (!response.ok) {
+            console.error(`[Yahoo] ${candidate} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
+            continue;
+          }
 
         const json: any = await response.json();
         const result = json?.chart?.result?.[0];
@@ -128,13 +131,14 @@ export class YahooClient {
         });
 
         return liveData;
-        } catch (err) {
-          // Try next host or candidate
+        } catch (err: any) {
+          console.error(`[Yahoo] ${candidate} @ ${host} failed:`, err.message || err);
           continue;
         }
       }
     }
 
+    console.warn(`[Yahoo] All candidates failed for ${cleanSym}`);
     return null;
   }
 
@@ -171,7 +175,10 @@ export class YahooClient {
             signal: AbortSignal.timeout(8000),
           });
 
-          if (!response.ok) continue;
+          if (!response.ok) {
+            console.error(`[Yahoo-Stats] ${candidate} @ ${host} HTTP error: ${response.status} ${response.statusText}`);
+            continue;
+          }
 
           const json: any = await response.json();
           const result = json?.chart?.result?.[0];
@@ -189,11 +196,13 @@ export class YahooClient {
             });
             return avgVol;
           }
-        } catch (err) {
+        } catch (err: any) {
+          console.error(`[Yahoo-Stats] ${candidate} @ ${host} failed:`, err.message || err);
           continue;
         }
       }
     }
+    console.warn(`[Yahoo-Stats] All candidates failed for ${cleanSym}`);
     return null;
   }
 

@@ -28,63 +28,102 @@ export class MarketDataService {
   async syncRealQuotes() {
     await this.refreshTrackedSymbols();
     const symbols = Array.from(this.trackedSymbols);
+    let realTicksCount = 0;
 
     for (const symbol of symbols) {
       try {
         const liveCandle = await yfCandleClient.fetchLatest(symbol);
-        if (liveCandle) {
-          // 1. Recalibrate local simulator baseline if enabled
-          marketSimulator.updateRealQuote(liveCandle);
+        if (!liveCandle) {
+          console.warn(`[MarketData] No data for ${symbol}`);
+          continue;
+        }
+        realTicksCount++;
 
-          // 2. Persist real market candle tick to TimescaleDB / PostgreSQL
-          await tickRepository.insertTick(liveCandle);
+        // 1. Recalibrate local simulator baseline if enabled
+        marketSimulator.updateRealQuote(liveCandle);
 
-          // 3. Publish real tick payload to Redis Pub/Sub & WebSocket
-          const tickPayload = {
-            type: 'tick',
-            symbol: liveCandle.symbol,
-            ltp: liveCandle.ltp,
-            volume: liveCandle.volume,
-            bid: liveCandle.bid,
-            ask: liveCandle.ask,
-            high: liveCandle.high,
-            low: liveCandle.low,
-            open: liveCandle.open,
-            close: liveCandle.close,
-            change: liveCandle.change,
-            changePercent: liveCandle.changePercent,
-            timestamp: liveCandle.timestamp.toISOString(),
-            isRealCandle: true,
+        // 2. Persist real market candle tick to TimescaleDB / PostgreSQL
+        await tickRepository.insertTick(liveCandle);
+
+        // 3. Publish real tick payload to Redis Pub/Sub & WebSocket
+        const tickPayload = {
+          type: 'tick',
+          symbol: liveCandle.symbol,
+          ltp: liveCandle.ltp,
+          volume: liveCandle.volume,
+          bid: liveCandle.bid,
+          ask: liveCandle.ask,
+          high: liveCandle.high,
+          low: liveCandle.low,
+          open: liveCandle.open,
+          close: liveCandle.close,
+          change: liveCandle.change,
+          changePercent: liveCandle.changePercent,
+          timestamp: liveCandle.timestamp.toISOString(),
+          isRealCandle: true,
+        };
+
+        try {
+          await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
+        } catch (e) {}
+
+        wsManager.broadcastToSymbol(symbol, tickPayload);
+
+        // 4. Process real tick through Signal Engine (Dead Cat Bounce, Breakout, Reversal)
+        const signals = await signalEngine.processTick(liveCandle);
+        for (const signal of signals) {
+          const signalPayload = {
+            type: 'signal',
+            symbol: signal.symbol,
+            signalType: signal.signalType,
+            severity: signal.severity,
+            description: signal.description,
+            metadata: signal.metadata,
+            timestamp: signal.triggeredAt.toISOString(),
           };
 
           try {
-            await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
+            await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
           } catch (e) {}
 
-          wsManager.broadcastToSymbol(symbol, tickPayload);
-
-          // 4. Process real tick through Signal Engine (Dead Cat Bounce, Breakout, Reversal)
-          const signals = await signalEngine.processTick(liveCandle);
-          for (const signal of signals) {
-            const signalPayload = {
-              type: 'signal',
-              symbol: signal.symbol,
-              signalType: signal.signalType,
-              severity: signal.severity,
-              description: signal.description,
-              metadata: signal.metadata,
-              timestamp: signal.triggeredAt.toISOString(),
-            };
-
-            try {
-              await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
-            } catch (e) {}
-
-            wsManager.broadcastToSymbol(symbol, signalPayload);
-          }
+          wsManager.broadcastToSymbol(symbol, signalPayload);
         }
-      } catch (err) {
-        // Continue to next symbol
+      } catch (err: any) {
+        console.error(`[MarketData] Error syncing quote for ${symbol}:`, err.message || err);
+      }
+    }
+
+    // Quick hack for demo/cloud environments when Yahoo blocks the server IP (e.g. Render):
+    // If all symbols returned null and the simulator timer isn't already running, generate ticks so the platform isn't dead
+    if (realTicksCount === 0 && symbols.length > 0 && !this.timer) {
+      console.warn('[MarketData] Real market feed returned 0 quotes (Yahoo IP block or offline). Emitting fallback ticks so terminal remains active.');
+      for (const symbol of symbols) {
+        try {
+          const tick = marketSimulator.generateTick(symbol);
+          await tickRepository.insertTick(tick);
+          const baseClose = tick.close ?? tick.ltp;
+          const change = Number((tick.ltp - baseClose).toFixed(2));
+          const changePercent = baseClose > 0 ? Number(((change / baseClose) * 100).toFixed(2)) : 0;
+          const tickPayload = {
+            type: 'tick',
+            symbol: tick.symbol,
+            ltp: tick.ltp,
+            volume: tick.volume,
+            bid: tick.bid,
+            ask: tick.ask,
+            high: tick.high,
+            low: tick.low,
+            open: tick.open,
+            close: tick.close,
+            change,
+            changePercent,
+            timestamp: tick.timestamp.toISOString(),
+          };
+          try {
+            await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
+          } catch (e) {}
+          wsManager.broadcastToSymbol(symbol, tickPayload);
+        } catch (err) {}
       }
     }
   }

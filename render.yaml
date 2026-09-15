@@ -14,6 +14,8 @@ services:
         fromDatabase:
           name: veritas-db
           property: connectionString
+      - key: ENABLE_SYNTHETIC_SIMULATOR
+        value: "true"
 
   # 2. Frontend Next.js Web Application
   - type: web
