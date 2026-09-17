@@ -28,7 +28,7 @@ export function StockChartModal({
   const curr = getCurrencySymbol(symbol || undefined);
   const [liveHistory, setLiveHistory] = useState<number[]>([]);
 
-  const ltp = tick?.ltp ?? snapshot?.ltp ?? (symbol === 'GROWW' ? 200 : 100);
+  const ltp = tick?.ltp ?? snapshot?.ltp ?? (symbol === 'GROWW' ? 190.45 : 100);
   const baseClose = snapshot?.close ?? tick?.close ?? ltp;
   const change =
     tick?.change !== undefined

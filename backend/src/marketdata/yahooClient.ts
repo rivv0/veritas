@@ -20,7 +20,7 @@ interface YahooSession {
 const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 const US_EQUITIES = new Set(['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META', 'WIT']);
 const SYMBOL_MAP: Record<string, string> = {
-  GROWW: 'ANGELONE.NS',
+  GROWW: 'GROWW.NS',
   TATAMOTORS: 'TMCV.NS',
   ZOMATO: 'ETERNAL.NS',
 };
