@@ -18,7 +18,13 @@ interface YahooSession {
 }
 
 const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-const US_EQUITIES = new Set(['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META', 'WIT']);
+const US_EQUITIES = new Set([
+  'NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'WIT',
+  'AMD', 'NFLX', 'INTC', 'PLTR', 'COIN', 'UBER', 'DIS', 'BABA', 'CRM',
+  'ORCL', 'ADBE', 'AVGO', 'QCOM', 'ARM', 'MU', 'SMCI', 'CRWD', 'PANW',
+  'NOW', 'SNOW', 'PYPL', 'HOOD', 'SOFI', 'SPY', 'QQQ', 'V', 'MA', 'JPM',
+  'BAC', 'WMT', 'COST', 'NKE', 'SBUX'
+]);
 const SYMBOL_MAP: Record<string, string> = {
   GROWW: 'GROWW.NS',
   TATAMOTORS: 'TMCV.NS',
@@ -359,6 +365,60 @@ export class YahooClient {
       }
     }
     return [];
+  }
+
+  private searchCache: Map<string, { data: { symbol: string; name: string; exchange: string; sector?: string }[]; expiresAt: number }> = new Map();
+
+  async search(query: string): Promise<{ symbol: string; name: string; exchange: string; sector?: string }[]> {
+    const clean = query.trim();
+    if (!clean || clean.length < 2) return [];
+
+    const cached = this.searchCache.get(clean.toUpperCase());
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    try {
+      const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(clean)}&quotesCount=8&newsCount=0`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': DEFAULT_UA },
+        signal: AbortSignal.timeout(2000), // Strict 2s timeout
+      });
+
+      if (!res.ok) return [];
+      const json: any = await res.json();
+      const quotes: any[] = json?.quotes || [];
+
+      const results = quotes
+        .filter((q) => q && q.symbol && (q.quoteType === 'EQUITY' || q.quoteType === 'ETF' || !q.quoteType))
+        .map((q) => {
+          let sym = (q.symbol as string).toUpperCase();
+          let exchange = q.exchange || 'GLOBAL';
+          if (sym.endsWith('.NS')) {
+            sym = sym.replace('.NS', '');
+            exchange = 'NSE';
+          } else if (sym.endsWith('.BO')) {
+            sym = sym.replace('.BO', '');
+            exchange = 'BSE';
+          }
+          return {
+            symbol: sym,
+            name: q.shortname || q.longname || sym,
+            exchange: exchange,
+            sector: q.sector || 'Equity',
+          };
+        });
+
+      if (results.length > 0) {
+        this.searchCache.set(clean.toUpperCase(), {
+          data: results,
+          expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes cache
+        });
+      }
+      return results;
+    } catch (e) {
+      return [];
+    }
   }
 
   private synthesizeIntradayCurve(open: number, high: number, low: number, close: number, ltp: number, points = 24): number[] {

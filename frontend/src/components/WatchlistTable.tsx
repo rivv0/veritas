@@ -21,6 +21,7 @@ import { ThesisPopover } from './ThesisPopover';
 import { TrajectoryStrip } from './TrajectoryStrip';
 import { useWatchlistStore } from '@/store/watchlistStore';
 import { getCurrencySymbol } from '@/lib/formatters';
+import { getStockName } from '@/lib/stockDirectory';
 import type { Watchlist, WsTick, WsSignal, MarketSnapshot } from '@/lib/types';
 
 interface Props {
@@ -91,12 +92,14 @@ export function WatchlistTable({
     const snap = getSnapshotForSymbol(sym);
     const struct = snap?.structure;
 
-    // Search query filter
+    // Search query filter (matches ticker code, full company name, or structure event)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
+      const name = getStockName(sym).toLowerCase();
       const matchSym = sym.toLowerCase().includes(q);
+      const matchName = name.includes(q);
       const matchSuffix = struct?.eventSuffix?.toLowerCase().includes(q);
-      if (!matchSym && !matchSuffix) return false;
+      if (!matchSym && !matchName && !matchSuffix) return false;
     }
 
     // L1 / L2 / L3 Tier filter
@@ -289,7 +292,7 @@ export function WatchlistTable({
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Search symbol or event suffix..."
+              placeholder="Search by symbol, company name (e.g. Nvidia, Reliance), or signal..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 rounded-none focus:outline-none focus:border-zinc-500"
@@ -513,11 +516,11 @@ export function WatchlistTable({
                         </span>
                       )}
                     </div>
+                    <div className="text-[10px] text-zinc-400 font-sans truncate max-w-[180px] leading-tight font-normal">
+                      {getStockName(symbol)}
+                    </div>
                     <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <span>{symbol.includes('.') ? symbol.split('.')[1] : 'NSE'} • EQ</span>
-                      {symbol === 'GROWW' && (
-                        <span className="text-zinc-400 font-medium tracking-tight">· Billionbrains Garage</span>
-                      )}
+                      <span>{symbol.includes('.') ? symbol.split('.')[1] : (['NVDA','AAPL','MSFT','GOOGL','AMZN','META','TSLA','AMD','NFLX','PLTR','COIN'].includes(symbol) ? 'NASDAQ' : 'NSE')} • EQ</span>
                       <ThesisPopover
                         watchlistId={watchlist.id}
                         symbol={symbol}
