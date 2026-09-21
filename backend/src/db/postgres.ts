@@ -31,11 +31,15 @@ pgPool.on('error', () => {
   }
 });
 
+let nextTickId = 1000;
+
 // In-Memory Storage Arrays
 const memoryStore = {
   users: [
     { id: 'demo-user', email: 'trader@groww.in', name: 'Pro Trader', created_at: new Date() }
   ],
+  alerts: [] as any[],
+  push_subscriptions: [] as any[],
   watchlists: [
     { id: 'wl-core', user_id: 'demo-user', name: 'Nifty 50 Core', sort_order: 1, is_default: true, created_at: new Date(), updated_at: new Date() },
     { id: 'wl-tech', user_id: 'demo-user', name: 'IT & Banking Giants', sort_order: 2, is_default: false, created_at: new Date(), updated_at: new Date() },
@@ -44,9 +48,9 @@ const memoryStore = {
   ],
   watchlist_items: [
     // Nifty 50 Core (16 stocks with Honorary GROWW)
-    { id: 'wi-0', watchlist_id: 'wl-core', symbol: 'GROWW', sort_order: 0, added_at: new Date() },
-    { id: 'wi-1', watchlist_id: 'wl-core', symbol: 'RELIANCE', sort_order: 1, added_at: new Date() },
-    { id: 'wi-2', watchlist_id: 'wl-core', symbol: 'TCS', sort_order: 2, added_at: new Date() },
+    { id: 'wi-0', watchlist_id: 'wl-core', symbol: 'GROWW', sort_order: 0, thesis: 'Long-term fintech & broker compounding leader', thesis_price: 195.84, added_at: new Date() },
+    { id: 'wi-1', watchlist_id: 'wl-core', symbol: 'RELIANCE', sort_order: 1, thesis: 'Retail & telecom conglomerate breakout', thesis_price: 1250.00, added_at: new Date() },
+    { id: 'wi-2', watchlist_id: 'wl-core', symbol: 'TCS', sort_order: 2, thesis: 'IT recovery turnaround; margin expansion', thesis_price: 2180.00, added_at: new Date() },
     { id: 'wi-3', watchlist_id: 'wl-core', symbol: 'INFY', sort_order: 3, added_at: new Date() },
     { id: 'wi-4', watchlist_id: 'wl-core', symbol: 'HDFCBANK', sort_order: 4, added_at: new Date() },
     { id: 'wi-5', watchlist_id: 'wl-core', symbol: 'ICICIBANK', sort_order: 5, added_at: new Date() },
@@ -82,7 +86,7 @@ const memoryStore = {
     { id: 'wi-32', watchlist_id: 'wl-growth', symbol: 'TRENT', sort_order: 7, added_at: new Date() },
     { id: 'wi-33', watchlist_id: 'wl-growth', symbol: 'VBL', sort_order: 8, added_at: new Date() },
     // US Tech Titans (7 US Equities)
-    { id: 'wi-us-1', watchlist_id: 'wl-us', symbol: 'NVDA', sort_order: 1, added_at: new Date() },
+    { id: 'wi-us-1', watchlist_id: 'wl-us', symbol: 'NVDA', sort_order: 1, thesis: 'AI hyperscale computing infrastructure moat', thesis_price: 110.00, added_at: new Date() },
     { id: 'wi-us-2', watchlist_id: 'wl-us', symbol: 'AAPL', sort_order: 2, added_at: new Date() },
     { id: 'wi-us-3', watchlist_id: 'wl-us', symbol: 'MSFT', sort_order: 3, added_at: new Date() },
     { id: 'wi-us-4', watchlist_id: 'wl-us', symbol: 'GOOGL', sort_order: 4, added_at: new Date() },
@@ -91,23 +95,23 @@ const memoryStore = {
     { id: 'wi-us-7', watchlist_id: 'wl-us', symbol: 'META', sort_order: 7, added_at: new Date() },
   ],
   market_ticks: [
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'GROWW', ltp: 200.00, volume: 31136422, high: 200.91, low: 192.60, open: 195.84, close: 195.84, bid: 199.80, ask: 200.20 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'RELIANCE', ltp: 1257.50, volume: 8777736, high: 1267.40, low: 1253.00, open: 1274.00, close: 1274.00, bid: 1256.85, ask: 1258.15 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TCS', ltp: 2200.80, volume: 2634124, high: 2232.60, low: 2185.50, open: 2204.10, close: 2204.10, bid: 2198.50, ask: 2202.50 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'INFY', ltp: 1037.70, volume: 6168088, high: 1047.30, low: 1029.70, open: 1036.50, close: 1036.50, bid: 1036.80, ask: 1038.50 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'HDFCBANK', ltp: 708.25, volume: 31411934, high: 709.00, low: 681.90, open: 693.80, close: 693.80, bid: 707.90, ask: 708.50 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ICICIBANK', ltp: 1379.30, volume: 7064417, high: 1389.00, low: 1367.60, open: 1384.50, close: 1384.50, bid: 1378.80, ask: 1379.80 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SBIN', ltp: 995.70, volume: 7771109, high: 1001.90, low: 993.00, open: 1009.70, close: 1009.70, bid: 995.20, ask: 996.20 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BHARTIARTL', ltp: 1831.10, volume: 4181325, high: 1852.00, low: 1830.50, open: 1839.00, close: 1839.00, bid: 1830.20, ask: 1832.00 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ITC', ltp: 259.85, volume: 11116049, high: 261.65, low: 257.70, open: 259.30, close: 259.30, bid: 259.60, ask: 260.10 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TATAMOTORS', ltp: 740.00, volume: 8400000, high: 752.00, low: 736.00, open: 748.50, close: 748.50, bid: 739.50, ask: 740.50 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'LT', ltp: 3930.70, volume: 1195489, high: 3948.00, low: 3880.70, open: 3955.00, close: 3955.00, bid: 3928.00, ask: 3932.00 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BAJFINANCE', ltp: 1034.50, volume: 5411299, high: 1035.00, low: 1015.10, open: 1043.50, close: 1043.50, bid: 1033.80, ask: 1035.20 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'MARUTI', ltp: 12400.00, volume: 620000, high: 12520.00, low: 12340.00, open: 12450.00, close: 12450.00, bid: 12390.00, ask: 12410.00 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SUNPHARMA', ltp: 1750.00, volume: 2900000, high: 1762.00, low: 1730.00, open: 1735.00, close: 1735.00, bid: 1749.00, ask: 1751.00 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TITAN', ltp: 3600.00, volume: 1400000, high: 3655.00, low: 3585.00, open: 3640.00, close: 3640.00, bid: 3598.00, ask: 3602.00 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'AXISBANK', ltp: 1246.00, volume: 4562285, high: 1252.80, low: 1229.80, open: 1246.00, close: 1246.00, bid: 1245.20, ask: 1246.80 },
-    { timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'WIT', ltp: 480.20, volume: 1500000, high: 488.00, low: 478.00, open: 485.00, close: 485.00, bid: 480.00, ask: 481.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'GROWW', ltp: 200.00, volume: 31136422, high: 200.91, low: 192.60, open: 195.84, close: 195.84, bid: 199.80, ask: 200.20 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'RELIANCE', ltp: 1257.50, volume: 8777736, high: 1267.40, low: 1253.00, open: 1274.00, close: 1274.00, bid: 1256.85, ask: 1258.15 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TCS', ltp: 2200.80, volume: 2634124, high: 2232.60, low: 2185.50, open: 2204.10, close: 2204.10, bid: 2198.50, ask: 2202.50 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'INFY', ltp: 1037.70, volume: 6168088, high: 1047.30, low: 1029.70, open: 1036.50, close: 1036.50, bid: 1036.80, ask: 1038.50 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'HDFCBANK', ltp: 708.25, volume: 31411934, high: 709.00, low: 681.90, open: 693.80, close: 693.80, bid: 707.90, ask: 708.50 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ICICIBANK', ltp: 1379.30, volume: 7064417, high: 1389.00, low: 1367.60, open: 1384.50, close: 1384.50, bid: 1378.80, ask: 1379.80 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SBIN', ltp: 995.70, volume: 7771109, high: 1001.90, low: 993.00, open: 1009.70, close: 1009.70, bid: 995.20, ask: 996.20 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BHARTIARTL', ltp: 1831.10, volume: 4181325, high: 1852.00, low: 1830.50, open: 1839.00, close: 1839.00, bid: 1830.20, ask: 1832.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'ITC', ltp: 259.85, volume: 11116049, high: 261.65, low: 257.70, open: 259.30, close: 259.30, bid: 259.60, ask: 260.10 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TATAMOTORS', ltp: 740.00, volume: 8400000, high: 752.00, low: 736.00, open: 748.50, close: 748.50, bid: 739.50, ask: 740.50 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'LT', ltp: 3930.70, volume: 1195489, high: 3948.00, low: 3880.70, open: 3955.00, close: 3955.00, bid: 3928.00, ask: 3932.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'BAJFINANCE', ltp: 1034.50, volume: 5411299, high: 1035.00, low: 1015.10, open: 1043.50, close: 1043.50, bid: 1033.80, ask: 1035.20 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'MARUTI', ltp: 12400.00, volume: 620000, high: 12520.00, low: 12340.00, open: 12450.00, close: 12450.00, bid: 12390.00, ask: 12410.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'SUNPHARMA', ltp: 1750.00, volume: 2900000, high: 1762.00, low: 1730.00, open: 1735.00, close: 1735.00, bid: 1749.00, ask: 1751.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'TITAN', ltp: 3600.00, volume: 1400000, high: 3655.00, low: 3585.00, open: 3640.00, close: 3640.00, bid: 3598.00, ask: 3602.00 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'AXISBANK', ltp: 1246.00, volume: 4562285, high: 1252.80, low: 1229.80, open: 1246.00, close: 1246.00, bid: 1245.20, ask: 1246.80 },
+    { tick_id: nextTickId++, timestamp: new Date(Date.now() - 45 * 60 * 1000), symbol: 'WIT', ltp: 480.20, volume: 1500000, high: 488.00, low: 478.00, open: 485.00, close: 485.00, bid: 480.00, ask: 481.00 },
   ] as any[],
   signals: [] as any[],
   user_sessions: [
@@ -259,6 +263,30 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
     return [] as any;
   }
 
+  // 3b. Update Thesis on Watchlist Item
+  if (cleanSql.includes('UPDATE watchlist_items SET thesis')) {
+    const [thesis, thesisPrice, watchlistId, symbol] = params;
+    const item = memoryStore.watchlist_items.find(wi => wi.watchlist_id === watchlistId && wi.symbol === symbol);
+    if (item) {
+      item.thesis = thesis;
+      item.thesis_price = thesisPrice !== null ? Number(thesisPrice) : undefined;
+    }
+    return [] as any;
+  }
+
+  // 3c. Get Theses for Watchlist
+  if (cleanSql.includes('FROM watchlist_items') && cleanSql.includes('thesis_price as "thesisPrice"')) {
+    const [watchlistId] = params;
+    const items = memoryStore.watchlist_items.filter(
+      wi => wi.watchlist_id === watchlistId && (wi.thesis || wi.thesis_price)
+    );
+    return items.map(wi => ({
+      symbol: wi.symbol,
+      thesis: wi.thesis,
+      thesisPrice: wi.thesis_price,
+    })) as any;
+  }
+
   // 4. Remove Symbol or Clear Watchlist Items
   if (cleanSql.includes('DELETE FROM watchlist_items')) {
     if (params.length === 2) {
@@ -274,14 +302,91 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
   // 5. Insert Market Tick
   if (cleanSql.includes('INSERT INTO market_ticks')) {
     const [timestamp, symbol, ltp, volume, bid, ask, high, low, open, close] = params;
-    memoryStore.market_ticks.push({ timestamp: new Date(timestamp), symbol, ltp, volume, bid, ask, high, low, open, close });
+    memoryStore.market_ticks.push({
+      tick_id: nextTickId++,
+      timestamp: new Date(timestamp),
+      symbol,
+      ltp,
+      volume,
+      bid,
+      ask,
+      high,
+      low,
+      open,
+      close
+    });
     if (memoryStore.market_ticks.length > 5000) memoryStore.market_ticks.shift();
     return [] as any;
   }
 
-  // 6. Get Latest Tick / At or Before
+  // 6. Get Market Ticks / Warmup / Catchup / Chart
   if (cleanSql.includes('FROM market_ticks')) {
-    if (cleanSql.includes('WHERE symbol = ANY($1)')) {
+    // 6a. Catch-up query: m.symbol = ANY($1) AND m.tick_id > $2
+    if (cleanSql.includes('AND m.tick_id > $2') || cleanSql.includes('tick_id > $2')) {
+      const [symbols, sinceTickId] = params;
+      const targetSymbols: string[] = Array.isArray(symbols) ? symbols : [symbols];
+      const filtered = memoryStore.market_ticks
+        .filter(t => targetSymbols.includes(t.symbol) && (t.tick_id || 0) > Number(sinceTickId))
+        .sort((a, b) => (a.tick_id || 0) - (b.tick_id || 0));
+      return filtered.map(t => ({
+        tickId: t.tick_id,
+        timestamp: t.timestamp,
+        symbol: t.symbol,
+        ltp: t.ltp,
+        volume: t.volume,
+        bid: t.bid,
+        ask: t.ask,
+        high: t.high,
+        low: t.low,
+        open: t.open,
+        close: t.close,
+        avgVolume20d: Number(memoryStore.symbol_stats.find(s => s.symbol === t.symbol)?.avg_volume_20d || t.volume || 1000000)
+      })) as any;
+    }
+
+    // 6b. Warmup query: WHERE m.symbol = $1 ORDER BY m.timestamp DESC LIMIT $2
+    if (cleanSql.includes('LIMIT $2') && cleanSql.includes('WHERE m.symbol = $1')) {
+      const [symbol, limit] = params;
+      const ticks = memoryStore.market_ticks
+        .filter(t => t.symbol === symbol)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        .slice(0, Number(limit));
+      return ticks.map(t => ({
+        tickId: t.tick_id,
+        timestamp: t.timestamp,
+        symbol: t.symbol,
+        ltp: t.ltp,
+        volume: t.volume,
+        bid: t.bid,
+        ask: t.ask,
+        high: t.high,
+        low: t.low,
+        open: t.open,
+        close: t.close,
+        avgVolume20d: Number(memoryStore.symbol_stats.find(s => s.symbol === t.symbol)?.avg_volume_20d || t.volume || 1000000)
+      })) as any;
+    }
+
+    // 6c. Chart & Trajectory time_bucket query
+    if (cleanSql.includes('time_bucket') || cleanSql.includes('INTERVAL')) {
+      const [symbol] = params;
+      const ticks = memoryStore.market_ticks
+        .filter(t => t.symbol === symbol)
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      if (ticks.length === 0) return [] as any;
+      return ticks.map(t => ({
+        time: t.timestamp,
+        day: t.timestamp,
+        open: t.open || t.ltp,
+        high: t.high || t.ltp,
+        low: t.low || t.ltp,
+        close: t.close || t.ltp,
+        volume: t.volume || 10000
+      })) as any;
+    }
+
+    // 6d. Snapshot query
+    if (cleanSql.includes('WHERE m.symbol = ANY($1)')) {
       const symbols: string[] = params[0] || [];
       const result: any[] = [];
       symbols.forEach(sym => {
@@ -329,9 +434,16 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
 
   // 7. Signals Table Insert / Query
   if (cleanSql.includes('INSERT INTO signals')) {
-    const [id, symbol, signal_type, severity, description, metadata, triggered_at] = params;
+    const [id, symbol, signal_type, severity, description, metadata, triggered_at, mode] = params;
     memoryStore.signals.push({
-      id, symbol, signal_type, severity, description, metadata, triggered_at: new Date(triggered_at)
+      id,
+      symbol,
+      signal_type,
+      severity,
+      description,
+      metadata,
+      triggered_at: new Date(triggered_at),
+      mode: mode || 'live'
     });
     return [] as any;
   }
@@ -339,7 +451,9 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
   if (cleanSql.includes('FROM signals')) {
     const [symbols, since] = params;
     const sinceTs = new Date(since).getTime();
-    const filtered = memoryStore.signals.filter(s => symbols.includes(s.symbol) && s.triggered_at.getTime() >= sinceTs);
+    const filtered = memoryStore.signals.filter(
+      s => symbols.includes(s.symbol) && s.triggered_at.getTime() >= sinceTs
+    );
     return filtered.map(s => ({
       id: s.id,
       symbol: s.symbol,
@@ -347,8 +461,134 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
       severity: s.severity,
       description: s.description,
       metadata: typeof s.metadata === 'string' ? JSON.parse(s.metadata) : s.metadata,
+      mode: s.mode || 'live',
       triggeredAt: s.triggered_at,
     })) as any;
+  }
+
+  // 7b. Alerts Table CRUD
+  if (cleanSql.includes('INSERT INTO alerts')) {
+    const [id, userId, symbol, condition, threshold, marketFilter] = params;
+    const alert = {
+      id,
+      user_id: userId,
+      symbol,
+      condition,
+      threshold: Number(threshold),
+      market_filter: marketFilter,
+      is_active: true,
+      created_at: new Date(),
+      triggered_at: null
+    };
+    memoryStore.alerts.push(alert);
+    return [{
+      id: alert.id,
+      userId: alert.user_id,
+      symbol: alert.symbol,
+      condition: alert.condition,
+      threshold: alert.threshold,
+      marketFilter: alert.market_filter,
+      triggeredAt: alert.triggered_at,
+      isActive: alert.is_active,
+      createdAt: alert.created_at
+    }] as any;
+  }
+
+  if (cleanSql.includes('FROM alerts')) {
+    if (cleanSql.includes('WHERE is_active = TRUE')) {
+      return memoryStore.alerts.filter(a => a.is_active).map(a => ({
+        id: a.id,
+        userId: a.user_id,
+        symbol: a.symbol,
+        condition: a.condition,
+        threshold: a.threshold,
+        marketFilter: a.market_filter,
+        triggeredAt: a.triggered_at,
+        isActive: a.is_active,
+        createdAt: a.created_at
+      })) as any;
+    }
+    const [userId] = params;
+    return memoryStore.alerts.filter(a => a.user_id === userId).map(a => ({
+      id: a.id,
+      userId: a.user_id,
+      symbol: a.symbol,
+      condition: a.condition,
+      threshold: a.threshold,
+      marketFilter: a.market_filter,
+      triggeredAt: a.triggered_at,
+      isActive: a.is_active,
+      createdAt: a.created_at
+    })) as any;
+  }
+
+  if (cleanSql.includes('UPDATE alerts')) {
+    if (cleanSql.includes('SET triggered_at = NOW()')) {
+      const [alertId] = params;
+      const alert = memoryStore.alerts.find(a => a.id === alertId);
+      if (alert) {
+        alert.triggered_at = new Date();
+        alert.is_active = false;
+      }
+      return [] as any;
+    }
+    if (cleanSql.includes('SET is_active = NOT is_active')) {
+      const [alertId, userId] = params;
+      const alert = memoryStore.alerts.find(a => a.id === alertId && a.user_id === userId);
+      if (alert) {
+        alert.is_active = !alert.is_active;
+        return [{ isActive: alert.is_active }] as any;
+      }
+      return [] as any;
+    }
+  }
+
+  if (cleanSql.includes('DELETE FROM alerts')) {
+    const [alertId, userId] = params;
+    memoryStore.alerts = memoryStore.alerts.filter(a => !(a.id === alertId && a.user_id === userId));
+    return [] as any;
+  }
+
+  // 7c. Push Subscriptions Table
+  if (cleanSql.includes('INSERT INTO push_subscriptions')) {
+    const [id, userId, deviceFp, endpoint, keys] = params;
+    const existing = memoryStore.push_subscriptions.find(p => p.user_id === userId && p.device_fp === deviceFp);
+    if (existing) {
+      existing.endpoint = endpoint;
+      existing.keys = keys;
+      existing.created_at = new Date();
+    } else {
+      memoryStore.push_subscriptions.push({ id, user_id: userId, device_fp: deviceFp, endpoint, keys, created_at: new Date() });
+    }
+    return [] as any;
+  }
+
+  if (cleanSql.includes('FROM push_subscriptions')) {
+    if (cleanSql.includes('WHERE user_id = $1')) {
+      const [userId] = params;
+      return memoryStore.push_subscriptions.filter(p => p.user_id === userId).map(p => ({
+        id: p.id,
+        userId: p.user_id,
+        deviceFp: p.device_fp,
+        endpoint: p.endpoint,
+        keys: p.keys,
+        createdAt: p.created_at
+      })) as any;
+    }
+    return memoryStore.push_subscriptions.map(p => ({
+      id: p.id,
+      userId: p.user_id,
+      deviceFp: p.device_fp,
+      endpoint: p.endpoint,
+      keys: p.keys,
+      createdAt: p.created_at
+    })) as any;
+  }
+
+  if (cleanSql.includes('DELETE FROM push_subscriptions')) {
+    const [endpoint] = params;
+    memoryStore.push_subscriptions = memoryStore.push_subscriptions.filter(p => p.endpoint !== endpoint);
+    return [] as any;
   }
 
   // 8. User Sessions
@@ -430,10 +670,16 @@ export async function initPostgresSchema() {
             watchlist_id VARCHAR(64) NOT NULL,
             symbol VARCHAR(32) NOT NULL,
             sort_order INT DEFAULT 0,
+            thesis TEXT,
+            thesis_price NUMERIC(12, 4),
             added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(watchlist_id, symbol)
         );
+        ALTER TABLE watchlist_items ADD COLUMN IF NOT EXISTS thesis TEXT;
+        ALTER TABLE watchlist_items ADD COLUMN IF NOT EXISTS thesis_price NUMERIC(12, 4);
+
         CREATE TABLE IF NOT EXISTS market_ticks (
+            tick_id BIGSERIAL,
             timestamp TIMESTAMPTZ NOT NULL,
             symbol VARCHAR(32) NOT NULL,
             ltp NUMERIC(12, 4) NOT NULL,
@@ -445,7 +691,10 @@ export async function initPostgresSchema() {
             open NUMERIC(12, 4),
             close NUMERIC(12, 4)
         );
+        ALTER TABLE market_ticks ADD COLUMN IF NOT EXISTS tick_id BIGSERIAL;
         CREATE INDEX IF NOT EXISTS idx_ticks_symbol_time ON market_ticks (symbol, timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_ticks_symbol_tickid ON market_ticks (symbol, tick_id DESC);
+
         CREATE TABLE IF NOT EXISTS signals (
             id VARCHAR(64) PRIMARY KEY,
             symbol VARCHAR(32) NOT NULL,
@@ -453,9 +702,36 @@ export async function initPostgresSchema() {
             severity INT NOT NULL,
             description TEXT,
             metadata JSONB DEFAULT '{}'::jsonb,
+            mode VARCHAR(16) DEFAULT 'live',
             triggered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
+        ALTER TABLE signals ADD COLUMN IF NOT EXISTS mode VARCHAR(16) DEFAULT 'live';
         CREATE INDEX IF NOT EXISTS idx_signals_symbol_time ON signals (symbol, triggered_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_signals_mode ON signals (mode);
+
+        CREATE TABLE IF NOT EXISTS alerts (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            symbol VARCHAR(32) NOT NULL,
+            condition VARCHAR(32) NOT NULL,
+            threshold NUMERIC(12, 4) NOT NULL,
+            market_filter JSONB,
+            triggered_at TIMESTAMPTZ,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_alerts_user_symbol ON alerts (user_id, symbol, is_active);
+
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            device_fp VARCHAR(64) NOT NULL,
+            endpoint TEXT NOT NULL,
+            keys JSONB NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, device_fp)
+        );
+
         CREATE TABLE IF NOT EXISTS user_sessions (
             user_id VARCHAR(64) NOT NULL,
             device_fp VARCHAR(64) NOT NULL,

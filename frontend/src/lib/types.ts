@@ -79,10 +79,14 @@ export interface MarketSnapshot {
   lastUpdated: string;
   sparkline?: number[];
   structure?: MarketStructure;
+  thesis?: string;
+  thesisPrice?: number;
+  trajectory?: TrajectoryData;
 }
 
 export interface WsTick {
   type: 'tick';
+  tickId?: number;
   symbol: string;
   ltp: number;
   volume: number;
@@ -105,7 +109,67 @@ export interface WsSignal {
   severity: number;
   description: string;
   metadata?: Record<string, any>;
+  mode?: 'live' | 'shadow';
   timestamp: string;
+}
+
+export interface WsMarketState {
+  type: 'market_state';
+  sessionState: 'REGULAR' | 'CLOSED' | 'PRE_MARKET_SOON';
+  isOpen: boolean;
+  nextOpen: string;
+  minutesToOpen: number;
+}
+
+export type AlertCondition = 'ABOVE' | 'BELOW' | 'PCT_CHANGE_UP' | 'PCT_CHANGE_DOWN';
+
+export interface MarketFilter {
+  index: 'SPX' | 'NIFTY' | 'IT' | 'BANK';
+  condition: 'GREEN' | 'RED' | 'ABOVE' | 'BELOW';
+  value?: number;
+}
+
+export interface Alert {
+  id: string;
+  userId: string;
+  symbol: string;
+  condition: AlertCondition;
+  threshold: number;
+  marketFilter?: MarketFilter;
+  triggeredAt?: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface TrajectoryData {
+  p30d: number;
+  p90d: number;
+  p1y: number;
+  spark30d: number[];
+  spark90d: number[];
+  spark1y: number[];
+}
+
+export interface ChartCandle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface BreadthStats {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  total: number;
+  advDecRatio: number;
+  avgChangePercent: number;
+  regime: 'BULLISH DOMINANCE' | 'BEARISH SKEW' | 'EQUILIBRIUM';
+  topGainer?: { symbol: string; changePercent: number };
+  topLoser?: { symbol: string; changePercent: number };
+  totalVolume: number;
 }
 
 export interface NewsItem {
@@ -118,4 +182,5 @@ export interface NewsItem {
   timeAgo: string;
   tag?: 'Bullish' | 'Bearish' | 'Earnings' | 'Deal' | 'Analyst' | 'Regulatory' | 'General';
 }
+
 

@@ -7,6 +7,11 @@ import { marketSimulator, REAL_MARKET_BASELINES } from '../marketdata/simulator'
 import { MarketSnapshot } from '../domain/types';
 import { newsService } from '../services/newsService';
 import { calculateMarketStructure } from '../signal/marketStructure';
+import { replayBacktester } from '../signal/replayBacktester';
+import { signalEngine } from '../signal/engine';
+import { query } from '../db/postgres';
+import { watchlistRepository } from '../repositories/watchlistRepository';
+
 
 const STOCK_DIRECTORY = [
   // Honorary & Nifty 50 Core Indian Stocks
@@ -228,6 +233,104 @@ export class MarketHandler {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  async getCatchup(req: AuthenticatedRequest, res: Response) {
+    try {
+      const symbolsStr = req.query.symbols as string;
+      const sinceTickIdStr = (req.query.since_tick_id || req.query.sinceTickId) as string;
+      const symbols = symbolsStr
+        ? symbolsStr.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : [];
+      const sinceTickId = sinceTickIdStr ? parseInt(sinceTickIdStr, 10) : 0;
+
+      if (symbols.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const ticks = await tickRepository.getCatchupTicks(symbols, sinceTickId);
+      res.json({ success: true, data: ticks });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async getChart(req: AuthenticatedRequest, res: Response) {
+    try {
+      const symbol = ((req.query.symbol as string) || 'GROWW').trim().toUpperCase();
+      const timeframe = (((req.query.timeframe as string) || '15m')) as '1m' | '5m' | '15m' | '1D';
+      const candles = await tickRepository.getChartCandles(symbol, timeframe);
+      res.json({ success: true, data: candles });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async getTrajectory(req: AuthenticatedRequest, res: Response) {
+    try {
+      const symbol = ((req.query.symbol as string) || 'GROWW').trim().toUpperCase();
+      const trajectory = await tickRepository.getTrajectoryData(symbol);
+      res.json({ success: true, data: trajectory });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async getSignals(req: AuthenticatedRequest, res: Response) {
+    try {
+      const symbolsStr = req.query.symbols as string;
+      const symbols = symbolsStr
+        ? symbolsStr.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : [];
+      const since = req.query.since
+        ? new Date(req.query.since as string)
+        : new Date(Date.now() - 30 * 60 * 1000);
+
+      const rows = await query<any>(
+        `SELECT id, symbol, signal_type as "signalType", severity, description, metadata, mode, triggered_at as "triggeredAt"
+         FROM signals
+         WHERE symbol = ANY($1) AND triggered_at >= $2
+         ORDER BY triggered_at DESC`,
+        [symbols, since]
+      );
+      res.json({ success: true, data: rows });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async runReplay(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { symbols, forwardWindowMinutes, targetReturnThreshold } = req.body;
+      const targetSymbols =
+        Array.isArray(symbols) && symbols.length > 0
+          ? symbols
+          : ['GROWW', 'RELIANCE', 'TCS', 'INFY'];
+      const reports = await replayBacktester.runBacktest({
+        symbols: targetSymbols,
+        forwardWindowMinutes,
+        targetReturnThreshold,
+      });
+      res.json({ success: true, data: reports });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async getDetectors(req: AuthenticatedRequest, res: Response) {
+    res.json({ success: true, data: signalEngine.getDetectorConfigs() });
+  }
+
+  async updateDetector(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { mode, enabled, minSeverity } = req.body;
+      const success = signalEngine.updateDetectorConfig(id, { mode, enabled, minSeverity });
+      res.json({ success });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 export const marketHandler = new MarketHandler();
+

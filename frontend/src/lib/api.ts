@@ -111,3 +111,95 @@ export async function fetchNews(symbols: string[]) {
   return res.json();
 }
 
+// User Price & Market Alerts API
+export async function fetchAlerts() {
+  const res = await fetch(`${API_BASE}/api/v1/alerts`, {
+    headers: getAuthHeaders(),
+  });
+  return res.json();
+}
+
+export async function createAlert(alertData: {
+  symbol: string;
+  condition: string;
+  threshold: number;
+  marketFilter?: {
+    index: string;
+    condition: string;
+    value?: number;
+  };
+}) {
+  const res = await fetch(`${API_BASE}/api/v1/alerts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(alertData),
+  });
+  return res.json();
+}
+
+export async function toggleAlert(alertId: string) {
+  const res = await fetch(`${API_BASE}/api/v1/alerts/${alertId}/toggle`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+  return res.json();
+}
+
+export async function deleteAlert(alertId: string) {
+  const res = await fetch(`${API_BASE}/api/v1/alerts/${alertId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  return res.json();
+}
+
+// Web Push VAPID API
+export async function fetchVapidKey() {
+  const res = await fetch(`${API_BASE}/api/v1/push/vapid-key`);
+  return res.json();
+}
+
+export async function registerPushSubscription(subscription: any) {
+  const res = await fetch(`${API_BASE}/api/v1/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ subscription }),
+  });
+  return res.json();
+}
+
+// Market Trajectory & Multi-Timeframe Chart Candles (TimescaleDB time_bucket)
+export async function fetchChartCandles(symbol: string, timeframe: '1m' | '5m' | '15m' | '1D' = '5m') {
+  const res = await fetch(`${API_BASE}/api/v1/market/chart?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`);
+  return res.json();
+}
+
+export async function fetchTrajectory(symbol: string) {
+  const res = await fetch(`${API_BASE}/api/v1/market/trajectory?symbol=${encodeURIComponent(symbol)}`);
+  return res.json();
+}
+
+export async function fetchCatchupTicks(symbols: string[], sinceTickId: number) {
+  const res = await fetch(
+    `${API_BASE}/api/v1/market/catchup?symbols=${encodeURIComponent(symbols.join(','))}&since_tick_id=${sinceTickId}`
+  );
+  return res.json();
+}
+
+export async function updateWatchlistThesis(
+  watchlistId: string,
+  symbol: string,
+  thesis: string,
+  thesisPrice?: number
+) {
+  const res = await fetch(
+    `${API_BASE}/api/v1/watchlists/${watchlistId}/symbols/${encodeURIComponent(symbol)}/thesis`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ thesis, thesisPrice }),
+    }
+  );
+  return res.json();
+}
+

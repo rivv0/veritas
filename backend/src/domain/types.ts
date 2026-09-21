@@ -22,9 +22,12 @@ export interface WatchlistItem {
   symbol: string;
   sortOrder: number;
   addedAt: Date;
+  thesis?: string;
+  thesisPrice?: number;
 }
 
 export interface Tick {
+  tickId?: number;
   timestamp: Date;
   symbol: string;
   ltp: number;
@@ -73,6 +76,9 @@ export interface MarketSnapshot {
   lastUpdated: Date;
   sparkline?: number[];
   structure?: MarketStructure;
+  thesis?: string;
+  thesisPrice?: number;
+  trajectory?: TrajectoryData;
 }
 
 export enum SignalType {
@@ -84,6 +90,7 @@ export enum SignalType {
   NEWS_VELOCITY = 'NEWS_VELOCITY',
   MOMENTUM_REVERSAL = 'MOMENTUM_REVERSAL',
   DEAD_CAT_BOUNCE = 'DEAD_CAT_BOUNCE',
+  GAP_DETECTION = 'GAP_DETECTION',
 }
 
 export interface Signal {
@@ -93,7 +100,73 @@ export interface Signal {
   severity: number; // 0 to 100
   description: string;
   metadata?: Record<string, any>;
+  mode?: 'live' | 'shadow';
   triggeredAt: Date;
+}
+
+export type AlertCondition = 'ABOVE' | 'BELOW' | 'PCT_CHANGE_UP' | 'PCT_CHANGE_DOWN';
+
+export interface MarketFilter {
+  index: 'SPX' | 'NIFTY' | 'IT' | 'BANK';
+  condition: 'GREEN' | 'RED' | 'ABOVE' | 'BELOW';
+  value?: number;
+}
+
+export interface Alert {
+  id: string;
+  userId: string;
+  symbol: string;
+  condition: AlertCondition;
+  threshold: number;
+  marketFilter?: MarketFilter;
+  triggeredAt?: Date | null;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
+
+export interface DetectorConfig {
+  id: string;
+  name: string;
+  mode: 'live' | 'shadow';
+  enabled: boolean;
+  minSeverity: number;
+}
+
+export interface ReplayReport {
+  detectorId: string;
+  totalSignals: number;
+  winningSignals: number;
+  hitRate: number; // percentage
+  avgReturnPercent: number;
+  profitFactor: number;
+  recommendation: 'PROMOTE_TO_LIVE' | 'NEEDS_TUNING' | 'REJECT';
+  evaluatedAt: Date;
+}
+
+export interface ChartCandle {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface TrajectoryData {
+  p30d: number; // % change 30d
+  p90d: number; // % change 90d
+  p1y: number;  // % change 1y
+  spark30d: number[];
+  spark90d: number[];
+  spark1y: number[];
 }
 
 export interface DigestItem {

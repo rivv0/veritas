@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useDigest } from '@/hooks/useDigest';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useWebPush } from '@/hooks/useWebPush';
 import { fetchSnapshot } from '@/lib/api';
 import { WatchlistTable } from '@/components/WatchlistTable';
 import { SinceYouLeft } from '@/components/SinceYouLeft';
@@ -11,8 +12,10 @@ import { CreateWatchlistModal } from '@/components/CreateWatchlistModal';
 import { WatchlistNewsFeed } from '@/components/WatchlistNewsFeed';
 import { SignalToast } from '@/components/SignalToast';
 import { StockChartModal } from '@/components/StockChartModal';
+import { MarketBreadthBar } from '@/components/MarketBreadthBar';
+import { AlertModal } from '@/components/AlertModal';
 import type { MarketSnapshot } from '@/lib/types';
-import { TrendingUp, RefreshCw, Layers, Plus, Zap } from 'lucide-react';
+import { TrendingUp, RefreshCw, Layers, Plus, Zap, Bell, BellRing } from 'lucide-react';
 
 export default function VeritasDashboard() {
   const {
@@ -33,6 +36,19 @@ export default function VeritasDashboard() {
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [simulateStale, setSimulateStale] = useState(false);
   const [inspectSymbol, setInspectSymbol] = useState<string | null>(null);
+
+  // User Alert Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertSymbol, setAlertSymbol] = useState<string>('GROWW');
+  const [alertPrice, setAlertPrice] = useState<number | undefined>(undefined);
+
+  // Web Push Hook
+  const {
+    isSupported: pushSupported,
+    isSubscribed: pushSubscribed,
+    loading: pushLoading,
+    subscribe: subscribePush,
+  } = useWebPush();
 
   const activeWatchlistId = activeWatchlist?.id || null;
   const activeSymbols = activeWatchlist?.symbols || [];
@@ -124,6 +140,37 @@ export default function VeritasDashboard() {
               </span>
             </div>
 
+            {/* Web Push Notification Arming */}
+            {pushSupported && (
+              <button
+                onClick={() => subscribePush()}
+                disabled={pushLoading || pushSubscribed}
+                className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border transition-colors flex items-center gap-1.5 ${
+                  pushSubscribed
+                    ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800 cursor-default'
+                    : 'bg-zinc-950 text-zinc-300 hover:text-white border-zinc-800 hover:bg-zinc-900'
+                }`}
+                title={pushSubscribed ? 'Web Push signals active for background alerts' : 'Enable Web Push alerts for closed tabs'}
+              >
+                {pushSubscribed ? <BellRing size={12} className="text-emerald-400" /> : <Bell size={12} />}
+                <span>{pushSubscribed ? 'PUSH ACTIVE' : pushLoading ? 'ARMING...' : 'ARM PUSH'}</span>
+              </button>
+            )}
+
+            {/* Price Alerts Center */}
+            <button
+              onClick={() => {
+                setAlertSymbol(activeSymbols[0] || 'GROWW');
+                setAlertPrice(undefined);
+                setShowAlertModal(true);
+              }}
+              className="px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5"
+              title="Open Price & Market-Condition Alerts"
+            >
+              <Bell size={12} />
+              <span>ALERTS</span>
+            </button>
+
             {/* Test Stale / Delayed Data Simulation Toggle */}
             <button
               onClick={() => setSimulateStale(!simulateStale)}
@@ -172,7 +219,10 @@ export default function VeritasDashboard() {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-5">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-4">
+        {/* Terminal-Grade Market Breadth Ribbon (Computed purely in Zustand store) */}
+        <MarketBreadthBar />
+
         {/* Watchlist Tabs Bar */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 gap-2">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5">
@@ -203,8 +253,6 @@ export default function VeritasDashboard() {
               <span>New List</span>
             </button>
           </div>
-
-          
         </div>
 
         {/* Dashboard Grid Layout */}
@@ -226,6 +274,11 @@ export default function VeritasDashboard() {
                   onRenameWatchlist={(newName) => rename(activeWatchlist.id, newName)}
                   onDeleteWatchlist={() => removeWatchlist(activeWatchlist.id)}
                   onInspectSymbol={(sym) => setInspectSymbol(sym)}
+                  onSetAlert={(sym, price) => {
+                    setAlertSymbol(sym);
+                    setAlertPrice(price);
+                    setShowAlertModal(true);
+                  }}
                 />
                 
                 {/* Live News Section for Shortlisted Stocks */}
@@ -257,6 +310,14 @@ export default function VeritasDashboard() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateWatchlist}
+      />
+
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        defaultSymbol={alertSymbol}
+        availableSymbols={activeSymbols}
+        currentPrice={alertPrice}
       />
 
       <SignalToast signals={signals} />

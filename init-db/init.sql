@@ -24,18 +24,21 @@ CREATE TABLE IF NOT EXISTS watchlists (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Watchlist items
+-- Watchlist items (with thesis tracking and entry price anchor)
 CREATE TABLE IF NOT EXISTS watchlist_items (
     id VARCHAR(64) PRIMARY KEY,
     watchlist_id VARCHAR(64) NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
     symbol VARCHAR(32) NOT NULL,
     sort_order INT DEFAULT 0,
+    thesis TEXT,
+    thesis_price NUMERIC(12, 4),
     added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(watchlist_id, symbol)
 );
 
 -- Market ticks (Hypertable if TimescaleDB present, standard indexed table otherwise)
 CREATE TABLE IF NOT EXISTS market_ticks (
+    tick_id BIGSERIAL,
     timestamp TIMESTAMPTZ NOT NULL,
     symbol VARCHAR(32) NOT NULL,
     ltp NUMERIC(12, 4) NOT NULL,
@@ -57,8 +60,9 @@ END $$;
 
 -- Create index on ticks for ultra-fast snapshot queries
 CREATE INDEX IF NOT EXISTS idx_ticks_symbol_time ON market_ticks (symbol, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_ticks_symbol_tickid ON market_ticks (symbol, tick_id DESC);
 
--- Signals log table
+-- Signals log table (with shadow mode vs live mode tracking)
 CREATE TABLE IF NOT EXISTS signals (
     id VARCHAR(64) PRIMARY KEY,
     symbol VARCHAR(32) NOT NULL,
@@ -66,10 +70,38 @@ CREATE TABLE IF NOT EXISTS signals (
     severity INT NOT NULL,
     description TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
+    mode VARCHAR(16) DEFAULT 'live',
     triggered_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_signals_symbol_time ON signals (symbol, triggered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_signals_mode ON signals (mode);
+
+-- User price alerts & composite market condition rules
+CREATE TABLE IF NOT EXISTS alerts (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    symbol VARCHAR(32) NOT NULL,
+    condition VARCHAR(32) NOT NULL,
+    threshold NUMERIC(12, 4) NOT NULL,
+    market_filter JSONB,
+    triggered_at TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_user_symbol ON alerts (user_id, symbol, is_active);
+
+-- Web Push (VAPID) Subscriptions for closed-tab notifications
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_fp VARCHAR(64) NOT NULL,
+    endpoint TEXT NOT NULL,
+    keys JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, device_fp)
+);
 
 -- User activity/session state for "Since You Left" digest tracking
 CREATE TABLE IF NOT EXISTS user_sessions (
@@ -79,6 +111,65 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     last_watchlist_id VARCHAR(64),
     PRIMARY KEY (user_id, device_fp)
 );
+
+-- Continuous Aggregates and TimescaleDB policies
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'create_hypertable') THEN
+    -- 1. Continuous Aggregate: 5-minute rollup for compression beyond raw retention
+    BEGIN
+      CREATE MATERIALIZED VIEW IF NOT EXISTS market_ticks_5m
+      WITH (timescaledb.continuous) AS
+      SELECT symbol,
+             time_bucket('5 minutes', timestamp) AS bucket,
+             first(open, timestamp) AS open,
+             max(high) AS high,
+             min(low) AS low,
+             last(close, timestamp) AS close,
+             sum(volume) AS volume
+      FROM market_ticks
+      GROUP BY symbol, bucket
+      WITH NO DATA;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'market_ticks_5m continuous aggregate setup skipped';
+    END;
+
+    -- 2. Continuous Aggregate: Daily rollup for trajectory strip & chart modal
+    BEGIN
+      CREATE MATERIALIZED VIEW IF NOT EXISTS symbol_daily_candles
+      WITH (timescaledb.continuous) AS
+      SELECT symbol,
+             time_bucket('1 day', timestamp) AS bucket,
+             first(open, timestamp) AS open,
+             max(high) AS high,
+             min(low) AS low,
+             last(close, timestamp) AS close,
+             sum(volume) AS volume
+      FROM market_ticks
+      GROUP BY symbol, bucket
+      WITH NO DATA;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'symbol_daily_candles continuous aggregate setup skipped';
+    END;
+
+    -- 3. Compression policy (compress chunks older than 7 days)
+    BEGIN
+      ALTER TABLE market_ticks SET (
+        timescaledb.compress,
+        timescaledb.compress_segmentby = 'symbol'
+      );
+      PERFORM add_compression_policy('market_ticks', INTERVAL '7 days', if_not_exists => TRUE);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'market_ticks compression policy skipped';
+    END;
+
+    -- 4. Retention policy (drop raw tick chunks older than 30 days)
+    BEGIN
+      PERFORM add_retention_policy('market_ticks', INTERVAL '30 days', if_not_exists => TRUE);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'market_ticks retention policy skipped';
+    END;
+  END IF;
+END $$;
 
 -- Symbol 20-Day Statistics (Calculated from true exchange historical volume)
 CREATE TABLE IF NOT EXISTS symbol_stats (

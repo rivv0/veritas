@@ -6,6 +6,9 @@ import { wsManager } from './websocket';
 import { mockAuthMiddleware } from './handlers/authHandler';
 import { watchlistHandler } from './handlers/watchlistHandler';
 import { marketHandler } from './handlers/marketHandler';
+import { alertHandler } from './handlers/alertHandler';
+import { pushHandler } from './handlers/pushHandler';
+import { sseHandler } from './handlers/sseHandler';
 import { marketDataService } from './services/marketDataService';
 
 const app = express();
@@ -26,14 +29,37 @@ app.delete('/api/v1/watchlists/:id', (req, res) => watchlistHandler.deleteWatchl
 app.put('/api/v1/watchlists/:id/reorder', (req, res) => watchlistHandler.reorderWatchlist(req, res));
 app.post('/api/v1/watchlists/:id/symbols', (req, res) => watchlistHandler.addSymbol(req, res));
 app.delete('/api/v1/watchlists/:id/symbols/:symbol', (req, res) => watchlistHandler.removeSymbol(req, res));
+app.patch('/api/v1/watchlists/:id/symbols/:symbol/thesis', (req, res) => watchlistHandler.updateThesis(req, res));
+app.get('/api/v1/watchlists/:id/theses', (req, res) => watchlistHandler.getTheses(req, res));
 
-// Market & Digest API Routes
+// Market & Telemetry API Routes
 app.get('/api/v1/market/snapshot', (req, res) => marketHandler.getSnapshot(req, res));
+app.get('/api/v1/market/catchup', (req, res) => marketHandler.getCatchup(req, res));
+app.get('/api/v1/market/chart', (req, res) => marketHandler.getChart(req, res));
+app.get('/api/v1/market/trajectory', (req, res) => marketHandler.getTrajectory(req, res));
+app.get('/api/v1/market/stream-sse', (req, res) => sseHandler.handleSseConnection(req, res));
 app.get('/api/v1/watchlists/:id/digest', (req, res) => marketHandler.getDigest(req, res));
 app.get('/api/v1/search', (req, res) => marketHandler.searchSymbols(req, res));
 app.get('/api/v1/news', (req, res) => marketHandler.getNews(req, res));
 
+// Signals & Replay API Routes
+app.get('/api/v1/signals', (req, res) => marketHandler.getSignals(req, res));
+app.post('/api/v1/signals/replay', (req, res) => marketHandler.runReplay(req, res));
+app.get('/api/v1/detectors', (req, res) => marketHandler.getDetectors(req, res));
+app.patch('/api/v1/detectors/:id', (req, res) => marketHandler.updateDetector(req, res));
+
+// User Price & Market Condition Alerts API Routes
+app.get('/api/v1/alerts', (req, res) => alertHandler.getAlerts(req, res));
+app.post('/api/v1/alerts', (req, res) => alertHandler.createAlert(req, res));
+app.patch('/api/v1/alerts/:id/toggle', (req, res) => alertHandler.toggleAlert(req, res));
+app.delete('/api/v1/alerts/:id', (req, res) => alertHandler.deleteAlert(req, res));
+
+// Web Push (VAPID) API Routes
+app.get('/api/v1/push/vapid-key', (req, res) => pushHandler.getVapidKey(req, res));
+app.post('/api/v1/push/subscribe', (req, res) => pushHandler.subscribe(req, res));
+
 const server = http.createServer(app);
+
 
 import { initPostgresSchema } from './db/postgres';
 

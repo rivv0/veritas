@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import { X, AlertTriangle, TrendingDown, TrendingUp, ShieldAlert, Activity, Layers, BarChart2 } from 'lucide-react';
-import type { MarketSnapshot, WsTick, WsSignal } from '@/lib/types';
+import type { MarketSnapshot, WsTick, WsSignal, ChartCandle } from '@/lib/types';
+import { fetchChartCandles } from '@/lib/api';
 import { SignalBadge } from './SignalBadge';
 import { getCurrencySymbol } from '@/lib/formatters';
 
@@ -27,6 +28,9 @@ export function StockChartModal({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const curr = getCurrencySymbol(symbol || undefined);
   const [liveHistory, setLiveHistory] = useState<number[]>([]);
+  const [timeframe, setTimeframe] = useState<'1m' | '5m' | '15m' | '1D'>('5m');
+  const [candles, setCandles] = useState<ChartCandle[]>([]);
+  const [loadingCandles, setLoadingCandles] = useState(false);
 
   const ltp = tick?.ltp ?? snapshot?.ltp ?? (symbol === 'GROWW' ? 190.45 : 100);
   const baseClose = snapshot?.close ?? tick?.close ?? ltp;
@@ -49,6 +53,22 @@ export function StockChartModal({
   const high = tick?.high ?? snapshot?.high ?? Math.max(ltp, baseClose);
   const low = tick?.low ?? snapshot?.low ?? Math.min(ltp, baseClose);
   const volume = tick?.volume ?? snapshot?.volume ?? 0;
+
+  // Multi-timeframe continuous aggregates from TimescaleDB (time_bucket)
+  useEffect(() => {
+    if (!isOpen || !symbol) return;
+    setLoadingCandles(true);
+    fetchChartCandles(symbol, timeframe)
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setCandles(res.data);
+        } else {
+          setCandles([]);
+        }
+      })
+      .catch((e) => console.warn('Failed to fetch chart candles:', e))
+      .finally(() => setLoadingCandles(false));
+  }, [symbol, isOpen, timeframe]);
 
   // Initialize and append live incoming ticks to history
   useEffect(() => {
@@ -98,7 +118,8 @@ export function StockChartModal({
   const paddingTop = 25;
   const paddingBottom = 30;
 
-  const chartData = liveHistory.length >= 2 ? liveHistory : [baseClose, ltp];
+  const candleCloses = candles.map((c) => c.close);
+  const chartData = candleCloses.length >= 2 ? candleCloses : liveHistory.length >= 2 ? liveHistory : [baseClose, ltp];
 
   const { coords, pathD, areaD, emaY, minVal, maxVal, lastPoint, emaVal } = useMemo(() => {
     const rawMin = Math.min(...chartData, low);
@@ -278,16 +299,27 @@ export function StockChartModal({
         {/* Intraday Chart View with Rich SVG Telemetry */}
         <div className="bg-black border border-zinc-800 p-3 space-y-2 relative select-none">
           <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 px-1">
-            <span className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1" style={{ backgroundColor: strokeColor }} /> 
-                <span>Intraday Price Line</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 border-t border-dashed border-amber-400" /> 
-                <span className="text-amber-300">20-EMA Resistance</span>
-              </span>
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-zinc-500 uppercase">Bucket:</span>
+              {(['1m', '5m', '15m', '1D'] as const).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-2 py-0.5 border text-[10px] font-bold rounded-none transition-colors ${
+                    timeframe === tf
+                      ? 'bg-white text-black border-white'
+                      : 'bg-zinc-950 text-zinc-400 hover:text-white border-zinc-800'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+              {loadingCandles && (
+                <span className="text-zinc-500 text-[9px] animate-pulse">
+                  time_bucket...
+                </span>
+              )}
+            </div>
             <span>Intraday Range: {curr}{low.toFixed(2)} — {curr}{high.toFixed(2)}</span>
           </div>
 
@@ -362,6 +394,30 @@ export function StockChartModal({
                 strokeDasharray="4 4"
                 opacity="0.85"
               />
+
+              {/* Volume Bars from TimescaleDB Candles */}
+              {candles.length > 0 &&
+                (() => {
+                  const maxVol = Math.max(...candles.map((c) => c.volume), 1);
+                  const barW = Math.max(2, (chartWidth - paddingLeft - paddingRight) / candles.length - 2);
+                  return coords.map((pt, i) => {
+                    const c = candles[i];
+                    if (!c) return null;
+                    const barH = Math.max(2, (c.volume / maxVol) * 32);
+                    const isGreen = c.close >= c.open;
+                    return (
+                      <rect
+                        key={i}
+                        x={pt.x - barW / 2}
+                        y={chartHeight - paddingBottom - barH}
+                        width={barW}
+                        height={barH}
+                        fill={isGreen ? '#10b981' : '#ef4444'}
+                        opacity={0.35}
+                      />
+                    );
+                  });
+                })()}
 
               {/* Neon Gradient Fill Under Curve */}
               <path d={areaD} fill={`url(#${gradientId})`} />

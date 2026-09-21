@@ -86,6 +86,30 @@ export class WatchlistRepository {
     return rows.map((r) => r.symbol);
   }
 
+  async updateThesis(watchlistId: string, symbol: string, thesis: string, thesisPrice?: number): Promise<void> {
+    const sql = `
+      UPDATE watchlist_items 
+      SET thesis = $1, thesis_price = $2 
+      WHERE watchlist_id = $3 AND symbol = $4
+    `;
+    await query(sql, [thesis, thesisPrice ?? null, watchlistId, symbol]);
+  }
+
+  async getWatchlistTheses(watchlistId: string): Promise<Record<string, { thesis?: string; thesisPrice?: number }>> {
+    const sql = `
+      SELECT symbol, thesis, thesis_price as "thesisPrice" 
+      FROM watchlist_items 
+      WHERE watchlist_id = $1 AND (thesis IS NOT NULL OR thesis_price IS NOT NULL)
+    `;
+    const rows = await query<{ symbol: string; thesis?: string; thesisPrice?: number }>(sql, [watchlistId]);
+    const result: Record<string, { thesis?: string; thesisPrice?: number }> = {};
+    rows.forEach(r => {
+      result[r.symbol] = { thesis: r.thesis, thesisPrice: r.thesisPrice ? Number(r.thesisPrice) : undefined };
+    });
+    return result;
+  }
+
+
   async seedDefaultsForUser(userId: string): Promise<Watchlist[]> {
     // 1. Ensure user exists
     await query(

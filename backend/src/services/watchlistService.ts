@@ -39,6 +39,15 @@ export class WatchlistService {
   async getAllTrackedSymbols(): Promise<string[]> {
     return watchlistRepository.getAllWatchlistSymbols();
   }
+
+  async updateThesis(watchlistId: string, symbol: string, thesis: string, thesisPrice?: number): Promise<void> {
+    await watchlistRepository.updateThesis(watchlistId, symbol.trim().toUpperCase(), thesis, thesisPrice);
+  }
+
+  async getWatchlistTheses(watchlistId: string): Promise<Record<string, { thesis?: string; thesisPrice?: number }>> {
+    return watchlistRepository.getWatchlistTheses(watchlistId);
+  }
 }
 
 export const watchlistService = new WatchlistService();
+

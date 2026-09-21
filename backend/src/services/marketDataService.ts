@@ -5,16 +5,25 @@ import { yahooClient } from '../marketdata/yahooClient';
 import { watchlistService } from './watchlistService';
 import { tickRepository } from '../repositories/tickRepository';
 import { signalEngine } from '../signal/engine';
-import { redisPub } from '../db/redis';
+import { alertEngine } from '../signal/alertEngine';
+import { calendarService } from './calendarService';
+import { warmupSeeder } from './warmupSeeder';
+import { reconciliationJob } from './reconciliationJob';
+import { redisPub, redisHotState } from '../db/redis';
 import { wsManager } from '../websocket';
 import { query } from '../db/postgres';
+import { Tick } from '../domain/types';
 
 export class MarketDataService {
-  private timer: NodeJS.Timeout | null = null;
-  private realSyncTimer: NodeJS.Timeout | null = null;
-  private statsSyncTimer: NodeJS.Timeout | null = null;
+  private loopTimer: NodeJS.Timeout | null = null;
+  private reconciliationTimer: NodeJS.Timeout | null = null;
   private trackedSymbols: Set<string> = new Set(config.market.symbols);
   private cycleCount = 0;
+
+  // Exponential backoff state with jitter
+  private consecutiveErrors = 0;
+  private baseDelayMs = 15000; // 15s when open
+  private offHoursDelayMs = 60 * 60 * 1000; // 60m when closed
 
   async refreshTrackedSymbols() {
     try {
@@ -26,209 +35,231 @@ export class MarketDataService {
     }
   }
 
-  async syncRealQuotes() {
-    this.cycleCount++;
-    await this.refreshTrackedSymbols();
-    const symbols = Array.from(this.trackedSymbols);
-    let realTicksCount = 0;
-    let nullCount = 0;
+  /**
+   * Process a tick through the Unified Evaluation Loop:
+   * 1. Indicator state update (WarmupSeeder)
+   * 2. Signal Engine (7 detectors + Gap detector, shadow vs live)
+   * 3. Alert Rules Engine (price thresholds + composite conditions)
+   * 4. Persistence (TimescaleDB hypertable + Redis hot state)
+   * 5. Fanout (Redis pub/sub + WebSocket broadcast + Web Push on alert)
+   */
+  async processUnifiedTick(tick: Tick, isRealCandle = true): Promise<void> {
+    const symbol = tick.symbol;
 
-    for (const symbol of symbols) {
-      try {
-        const liveCandle = await yfCandleClient.fetchLatest(symbol);
-        if (!liveCandle) {
-          nullCount++;
-          if (!yahooClient.isRateLimited()) {
-            console.warn(`[MarketData] No data for ${symbol}`);
-          }
-          continue;
-        }
-        realTicksCount++;
+    // 1. Indicator state update
+    warmupSeeder.appendTick(symbol, tick.ltp);
 
-        // 1. Recalibrate local simulator baseline if enabled
-        marketSimulator.updateRealQuote(liveCandle);
+    const baseClose = tick.close ?? tick.ltp;
+    const change = Number((tick.ltp - baseClose).toFixed(2));
+    const changePercent = baseClose > 0 ? Number(((change / baseClose) * 100).toFixed(2)) : 0;
 
-        // 2. Persist real market candle tick to TimescaleDB / PostgreSQL
-        await tickRepository.insertTick(liveCandle);
+    const tickPayload = {
+      type: 'tick',
+      symbol,
+      ltp: tick.ltp,
+      volume: tick.volume,
+      bid: tick.bid,
+      ask: tick.ask,
+      high: tick.high,
+      low: tick.low,
+      open: tick.open,
+      close: tick.close,
+      change,
+      changePercent,
+      timestamp: tick.timestamp instanceof Date ? tick.timestamp.toISOString() : new Date().toISOString(),
+      isRealCandle,
+    };
 
-        // 3. Publish real tick payload to Redis Pub/Sub & WebSocket
-        const tickPayload = {
-          type: 'tick',
-          symbol: liveCandle.symbol,
-          ltp: liveCandle.ltp,
-          volume: liveCandle.volume,
-          bid: liveCandle.bid,
-          ask: liveCandle.ask,
-          high: liveCandle.high,
-          low: liveCandle.low,
-          open: liveCandle.open,
-          close: liveCandle.close,
-          change: liveCandle.change,
-          changePercent: liveCandle.changePercent,
-          timestamp: liveCandle.timestamp.toISOString(),
-          isRealCandle: true,
+    // 2. Persist to TimescaleDB hypertable
+    try {
+      await tickRepository.insertTick(tick);
+    } catch (e) { }
+
+    // 3. Hot state write: Redis last_tick:<SYMBOL>
+    try {
+      await redisHotState.setLastTick(symbol, tickPayload);
+    } catch (e) { }
+
+    // 4. Record to WebSocket manager (snapshot cache & ring buffer)
+    wsManager.recordTick(symbol, tickPayload);
+
+    // 5. Fanout via Redis Pub/Sub & live WebSocket
+    try {
+      await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
+    } catch (e) { }
+
+    wsManager.broadcastToSymbol(symbol, tickPayload);
+
+    // 6. Signal Engine evaluation
+    try {
+      const signals = await signalEngine.processTick(tick);
+      for (const signal of signals) {
+        const signalPayload = {
+          type: 'signal',
+          symbol: signal.symbol,
+          signalType: signal.signalType,
+          severity: signal.severity,
+          description: signal.description,
+          metadata: signal.metadata,
+          mode: signal.mode || 'live',
+          timestamp: signal.triggeredAt.toISOString(),
         };
 
-        try {
-          await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
-        } catch (e) { }
-
-        wsManager.broadcastToSymbol(symbol, tickPayload);
-
-        // 4. Process real tick through Signal Engine (Dead Cat Bounce, Breakout, Reversal)
-        const signals = await signalEngine.processTick(liveCandle);
-        for (const signal of signals) {
-          const signalPayload = {
-            type: 'signal',
-            symbol: signal.symbol,
-            signalType: signal.signalType,
-            severity: signal.severity,
-            description: signal.description,
-            metadata: signal.metadata,
-            timestamp: signal.triggeredAt.toISOString(),
-          };
-
+        // Only broadcast live signals to clients (shadow signals remain persisted for backtest scoring)
+        if (signal.mode !== 'shadow') {
           try {
             await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
           } catch (e) { }
 
           wsManager.broadcastToSymbol(symbol, signalPayload);
         }
+      }
+    } catch (err: any) {
+      console.warn(`[MarketDataService] Signal engine error for ${symbol}:`, err.message || err);
+    }
+
+    // 7. Alert Rules Engine evaluation (price + composite market condition)
+    try {
+      await alertEngine.evaluateTick(tick);
+    } catch (err: any) {
+      console.warn(`[MarketDataService] Alert engine error for ${symbol}:`, err.message || err);
+    }
+  }
+
+  /**
+   * Calendar-aware sync cycle:
+   * Polls 15s during open market hours; hourly off-hours.
+   * Exponential backoff with ±20% jitter on rate-limits.
+   */
+  async syncQuotesCycle(): Promise<void> {
+    this.cycleCount++;
+    await this.refreshTrackedSymbols();
+    const symbols = Array.from(this.trackedSymbols);
+
+    const isAnyOpen = calendarService.isAnyMarketOpen(symbols);
+
+    // Broadcast market state notice
+    const sampleSymbol = symbols[0] || 'GROWW';
+    const sessionInfo = calendarService.getMarketSession(sampleSymbol);
+    wsManager.broadcastSystemEvent({
+      type: 'market_state',
+      sessionState: sessionInfo.sessionState,
+      isOpen: isAnyOpen,
+      nextOpen: sessionInfo.nextOpen.toISOString(),
+      minutesToOpen: sessionInfo.minutesToOpen,
+    });
+
+    let successCount = 0;
+    let nullCount = 0;
+
+    for (const symbol of symbols) {
+      const isSymbolMarketOpen = calendarService.isMarketOpen(symbol);
+
+      // In off-hours, we still do hourly checks, but skip intense 15s polling if closed
+      if (!isSymbolMarketOpen && this.cycleCount % 240 !== 1) {
+        // Only poll closed market symbols once every ~60m (every 240 cycles of 15s)
+        continue;
+      }
+
+      try {
+        const liveCandle = await yfCandleClient.fetchLatest(symbol);
+        if (!liveCandle) {
+          nullCount++;
+          continue;
+        }
+
+        successCount++;
+        marketSimulator.updateRealQuote(liveCandle);
+        await this.processUnifiedTick(liveCandle, true);
       } catch (err: any) {
-        console.error(`[MarketData] Error syncing quote for ${symbol}:`, err.message || err);
+        nullCount++;
       }
     }
 
-    // Heartbeat: log once every cycle so Render logs prove the loop is alive
+    // If rate-limited or high failure rate, backoff with jitter
+    if (yahooClient.isRateLimited() || (nullCount > 0 && successCount === 0)) {
+      this.consecutiveErrors++;
+    } else {
+      this.consecutiveErrors = 0;
+    }
+
     console.log(
-      `[MarketData] cycle #${this.cycleCount} | symbols=${symbols.length} ` +
-      `success=${realTicksCount} null=${nullCount} ` +
-      `rateLimited=${yahooClient.isRateLimited()}`
+      `[MarketData] cycle #${this.cycleCount} | open=${isAnyOpen} | symbols=${symbols.length} ` +
+      `success=${successCount} null=${nullCount} rateLimited=${yahooClient.isRateLimited()}`
     );
   }
 
-  async syncSymbolStats() {
+  /**
+   * Calculate next poll delay based on market status and backoff with ±20% jitter
+   */
+  private getNextDelayMs(): number {
+    const symbols = Array.from(this.trackedSymbols);
+    const isOpen = calendarService.isAnyMarketOpen(symbols);
+
+    let base = isOpen ? this.baseDelayMs : this.offHoursDelayMs;
+
+    if (this.consecutiveErrors > 0) {
+      // Exponential backoff up to 60s
+      base = Math.min(60000, this.baseDelayMs * Math.pow(1.8, Math.min(this.consecutiveErrors, 4)));
+    }
+
+    // Apply ±20% jitter against thundering herds
+    const jitterFactor = 0.8 + Math.random() * 0.4;
+    return Math.round(base * jitterFactor);
+  }
+
+  private scheduleNextCycle() {
+    const delay = this.getNextDelayMs();
+    this.loopTimer = setTimeout(async () => {
+      try {
+        await this.syncQuotesCycle();
+      } catch (err) {
+        console.error('[MarketDataService] Cycle error:', err);
+      } finally {
+        this.scheduleNextCycle();
+      }
+    }, delay);
+  }
+
+  async startTickStream() {
+    if (this.loopTimer) return;
+    console.log('[MarketDataService] Booting VERITAS Market Streamer...');
+
     await this.refreshTrackedSymbols();
     const symbols = Array.from(this.trackedSymbols);
-    let updated = 0;
-    for (const symbol of symbols) {
-      try {
-        const avgVol = await yahooClient.fetch20DayAvgVolume(symbol);
-        if (avgVol && avgVol > 0) {
-          const sql = `
-            INSERT INTO symbol_stats (symbol, avg_volume_20d, updated_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (symbol) DO UPDATE SET avg_volume_20d = EXCLUDED.avg_volume_20d, updated_at = NOW()
-          `;
-          await query(sql, [symbol, avgVol]);
-          updated++;
-        }
-      } catch (err) {
-        // Continue to next symbol
-      }
-    }
-    console.log(`[MarketData] syncSymbolStats complete | updated=${updated}/${symbols.length}`);
-  }
 
-  startFallbackSimulator() {
-    if (this.timer) return;
-    console.log('[MarketDataService] Continuous fallback tick streamer active (ensures real-time streaming)');
-    this.timer = setInterval(async () => {
-      const symbols = Array.from(this.trackedSymbols);
-      for (const symbol of symbols) {
-        try {
-          const tick = marketSimulator.generateTick(symbol);
-          await tickRepository.insertTick(tick);
-          const baseClose = tick.close ?? tick.ltp;
-          const change = Number((tick.ltp - baseClose).toFixed(2));
-          const changePercent = baseClose > 0 ? Number(((change / baseClose) * 100).toFixed(2)) : 0;
-          const tickPayload = {
-            type: 'tick',
-            symbol: tick.symbol,
-            ltp: tick.ltp,
-            volume: tick.volume,
-            bid: tick.bid,
-            ask: tick.ask,
-            high: tick.high,
-            low: tick.low,
-            open: tick.open,
-            close: tick.close,
-            change,
-            changePercent,
-            timestamp: tick.timestamp.toISOString(),
-          };
-          try {
-            await redisPub.publish(`market:ticks:${symbol}`, JSON.stringify(tickPayload));
-          } catch (e) { }
-          wsManager.broadcastToSymbol(symbol, tickPayload);
-
-          const signals = await signalEngine.processTick(tick);
-          for (const signal of signals) {
-            const signalPayload = {
-              type: 'signal',
-              symbol: signal.symbol,
-              signalType: signal.signalType,
-              severity: signal.severity,
-              description: signal.description,
-              metadata: signal.metadata,
-              timestamp: signal.triggeredAt.toISOString(),
-            };
-            try {
-              await redisPub.publish(`market:signals:${symbol}`, JSON.stringify(signalPayload));
-            } catch (e) { }
-            wsManager.broadcastToSymbol(symbol, signalPayload);
-          }
-        } catch (err) { }
-      }
-    }, config.market.tickIntervalMs || 2000);
-  }
-
-  startTickStream() {
-    if (this.realSyncTimer) return;
-    console.log('[MarketDataService] Starting Market Data Streamer...');
-
-    // Only enable synthetic simulator if explicitly requested via environment variable
-    if (process.env.ENABLE_SYNTHETIC_SIMULATOR === 'true') {
-      this.startFallbackSimulator();
+    // 1. Warm-Up Seeder: Prime 20-EMA, RSI, and ATR from the last 60 ticks before accepting live data
+    try {
+      await warmupSeeder.seedSymbols(symbols);
+    } catch (err) {
+      console.warn('[MarketDataService] Warmup seeder warning:', err);
     }
 
-    // 1. Initial real market sync followed by 20-day volume history sync (sequenced to prevent Yahoo burst)
-    (async () => {
-      try {
-        await this.syncRealQuotes();
-      } catch (err) {
-        console.error('[MarketDataService] Initial syncRealQuotes error:', err);
-      }
-      try {
-        await this.syncSymbolStats();
-      } catch (err) {
-        console.error('[MarketDataService] Initial syncSymbolStats error:', err);
-      }
-    })();
+    // 2. Pre-load active user alert rules into AlertEngine
+    try {
+      await alertEngine.refreshActiveAlerts();
+    } catch (err) { }
 
-    // 2. Continuous real market polling cycle (every 15s for high-resolution candle updates)
-    this.realSyncTimer = setInterval(() => {
-      this.syncRealQuotes().catch(console.error);
-    }, 15000);
+    // 3. Kick off immediate first quote cycle
+    await this.syncQuotesCycle().catch(console.error);
 
-    // 3. Daily 20-day average volume refresh cycle (every 24 hours)
-    this.statsSyncTimer = setInterval(() => {
-      this.syncSymbolStats().catch(console.error);
-    }, 24 * 60 * 60 * 1000);
+    // 4. Schedule calendar-aware dynamic cycle with jittered backoff
+    this.scheduleNextCycle();
+
+    // 5. Hourly Reconciliation Job
+    this.reconciliationTimer = setInterval(() => {
+      reconciliationJob.reconcileSymbols(Array.from(this.trackedSymbols)).catch(console.error);
+    }, 60 * 60 * 1000);
   }
 
   stopTickStream() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.loopTimer) {
+      clearTimeout(this.loopTimer);
+      this.loopTimer = null;
     }
-    if (this.realSyncTimer) {
-      clearInterval(this.realSyncTimer);
-      this.realSyncTimer = null;
-    }
-    if (this.statsSyncTimer) {
-      clearInterval(this.statsSyncTimer);
-      this.statsSyncTimer = null;
+    if (this.reconciliationTimer) {
+      clearInterval(this.reconciliationTimer);
+      this.reconciliationTimer = null;
     }
   }
 }

@@ -10,12 +10,16 @@ import {
   Edit2,
   Check,
   X,
+  Bell,
 } from 'lucide-react';
 import { RealtimePrice } from './RealtimePrice';
 import { SignalBadge } from './SignalBadge';
 import { StaleIndicator } from './StaleIndicator';
 import { AddSymbolModal } from './AddSymbolModal';
 import { Sparkline } from './Sparkline';
+import { ThesisPopover } from './ThesisPopover';
+import { TrajectoryStrip } from './TrajectoryStrip';
+import { useWatchlistStore } from '@/store/watchlistStore';
 import { getCurrencySymbol } from '@/lib/formatters';
 import type { Watchlist, WsTick, WsSignal, MarketSnapshot } from '@/lib/types';
 
@@ -32,6 +36,7 @@ interface Props {
   onRenameWatchlist?: (name: string) => void;
   onDeleteWatchlist?: () => void;
   onInspectSymbol?: (symbol: string) => void;
+  onSetAlert?: (symbol: string, currentPrice?: number) => void;
 }
 
 export function WatchlistTable({
@@ -47,10 +52,14 @@ export function WatchlistTable({
   onRenameWatchlist,
   onDeleteWatchlist,
   onInspectSymbol,
+  onSetAlert,
 }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(watchlist.name);
+
+  const updateStoreThesis = useWatchlistStore((s) => s.updateThesis);
+  const thesesMap = useWatchlistStore((s) => s.theses);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -504,12 +513,40 @@ export function WatchlistTable({
                         </span>
                       )}
                     </div>
-                    <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5">
+                    <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
                       <span>{symbol.includes('.') ? symbol.split('.')[1] : 'NSE'} • EQ</span>
                       {symbol === 'GROWW' && (
                         <span className="text-zinc-400 font-medium tracking-tight">· Billionbrains Garage</span>
                       )}
+                      <ThesisPopover
+                        watchlistId={watchlist.id}
+                        symbol={symbol}
+                        currentPrice={tick?.ltp ?? fallbackPrice}
+                        initialThesis={thesesMap[symbol.toUpperCase()]?.thesis ?? snap?.thesis}
+                        initialPrice={thesesMap[symbol.toUpperCase()]?.thesisPrice ?? snap?.thesisPrice}
+                        onSave={(t, p) => updateStoreThesis(symbol, t, p)}
+                      />
                     </div>
+                    {/* Context Annotations: e.g. 2.4x volume, sector flat, opening gap */}
+                    {(() => {
+                      const sig = symbolSignals[0] || signals.find((s) => s.symbol === symbol);
+                      const annotation =
+                        sig?.metadata?.rationale ||
+                        sig?.description ||
+                        (snap?.avgVolume20d && volume > snap.avgVolume20d * 1.5
+                          ? `${(volume / (snap.avgVolume20d || 1)).toFixed(1)}× volume spike`
+                          : null);
+                      if (!annotation) return null;
+                      return (
+                        <div
+                          className="mt-1 flex items-center gap-1 text-[9px] font-mono text-zinc-300 max-w-[260px] truncate"
+                          title={annotation}
+                        >
+                          <span className="text-amber-400 shrink-0">⚡</span>
+                          <span className="truncate">{annotation}</span>
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* Realtime Price */}
@@ -588,6 +625,9 @@ export function WatchlistTable({
                         </div>
                       )}
 
+                      {/* Multi-Timeframe Trajectory Strip (30d / 90d / 1y) */}
+                      <TrajectoryStrip symbol={symbol} />
+
                       {/* Active Signals */}
                       <div className="flex flex-wrap gap-1">
                         {symbolSignals.length > 0 ? (
@@ -613,6 +653,13 @@ export function WatchlistTable({
                   {/* Actions */}
                   <td className="py-3 px-3 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => onSetAlert?.(symbol, tick?.ltp ?? fallbackPrice)}
+                        className="p-1 rounded-none text-zinc-600 hover:text-amber-400 hover:bg-zinc-900 transition-colors"
+                        title={`Set price or market alert for ${symbol}`}
+                      >
+                        <Bell size={13} />
+                      </button>
                       <button
                         onClick={() => onInspectSymbol?.(symbol)}
                         className={`p-1 rounded-none transition-colors ${

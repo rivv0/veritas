@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, BellOff } from 'lucide-react';
+import { X, BellOff, Target } from 'lucide-react';
 import type { WsSignal } from '@/lib/types';
+import { useWatchlistStore } from '@/store/watchlistStore';
 
 interface Props {
   signals: WsSignal[];
@@ -13,6 +14,9 @@ export function SignalToast({ signals }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const lastProcessedTimeRef = useRef<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const theses = useWatchlistStore((s) => s.theses);
+  const ticks = useWatchlistStore((s) => s.ticks);
 
   useEffect(() => {
     if (isMuted || signals.length === 0) return;
@@ -54,20 +58,19 @@ export function SignalToast({ signals }: Props) {
   const keyStats = metadata.keyStats || [];
   const rationale = metadata.rationale || activeToast.description;
 
-  // Primary highlight stat
-  const primaryStat = keyStats.length > 0 
-    ? `${keyStats[0].label}: ${keyStats[0].value}`
-    : `Sev: ${activeToast.severity}/100`;
-
-  const secondaryStat = keyStats.length > 1
-    ? `${keyStats[1].label}: ${keyStats[1].value}`
-    : '';
-
   const cleanSignalName = (activeToast.signalType || 'SIGNAL').replace(/_/g, ' ');
+
+  const symbolThesis = theses[activeToast.symbol.toUpperCase()];
+  const currentTick = ticks[activeToast.symbol.toUpperCase()];
+  const hasAnchor = symbolThesis?.thesisPrice && symbolThesis.thesisPrice > 0;
+  const currentPrice = currentTick?.ltp ?? symbolThesis?.thesisPrice ?? 0;
+  const pnlPercent = hasAnchor && currentPrice > 0
+    ? Number((((currentPrice - symbolThesis!.thesisPrice!) / symbolThesis!.thesisPrice!) * 100).toFixed(1))
+    : null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full animate-in slide-in-from-bottom-3 fade-in duration-200 font-sans">
-      <div className="bg-[#09090b] border border-zinc-700/80 shadow-[0_4px_24px_rgba(0,0,0,0.9)] p-3 text-zinc-100 rounded-none space-y-1.5">
+      <div className="bg-[#09090b] border border-zinc-700/80 shadow-[0_4px_24px_rgba(0,0,0,0.9)] p-3 text-zinc-100 rounded-none space-y-2">
         {/* Top compact row */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -77,9 +80,6 @@ export function SignalToast({ signals }: Props) {
             </span>
             <span className="px-1.5 py-0.2 bg-zinc-900 border border-zinc-700 text-[10px] font-mono text-zinc-300 uppercase tracking-wide shrink-0">
               {cleanSignalName}
-            </span>
-            <span className="text-[11px] font-mono text-zinc-400 truncate">
-              {primaryStat}
             </span>
           </div>
 
@@ -101,10 +101,31 @@ export function SignalToast({ signals }: Props) {
           </div>
         </div>
 
+        {/* User Thesis Context Anchor (The Differentiator) */}
+        {symbolThesis && (symbolThesis.thesis || symbolThesis.thesisPrice) && (
+          <div className="flex items-center justify-between gap-1.5 text-[10px] font-mono bg-zinc-950 border border-zinc-800 px-2 py-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Target size={11} className="text-zinc-400 shrink-0" />
+              <span className="truncate text-zinc-300">
+                {symbolThesis.thesis || 'Anchor Position'}
+              </span>
+            </div>
+            {pnlPercent !== null && (
+              <span
+                className={`font-bold shrink-0 ${
+                  pnlPercent > 0 ? 'text-emerald-400' : pnlPercent < 0 ? 'text-red-400' : 'text-zinc-400'
+                }`}
+              >
+                {pnlPercent > 0 ? '+' : ''}{pnlPercent}% P&L
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Bottom compact statistics line */}
         <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 border-t border-zinc-800/80 pt-1.5 gap-2">
           <span className="truncate text-zinc-300">
-            {secondaryStat ? `${secondaryStat} • ` : ''}{rationale}
+            {rationale}
           </span>
           <span className="shrink-0 text-zinc-400">
             {activeToast.severity}/100

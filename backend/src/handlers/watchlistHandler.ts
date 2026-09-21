@@ -84,6 +84,28 @@ export class WatchlistHandler {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  async updateThesis(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id, symbol } = req.params;
+      const { thesis, thesisPrice } = req.body;
+      await watchlistService.updateThesis(id, symbol, thesis, thesisPrice);
+      res.json({ success: true, message: 'Thesis updated successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  async getTheses(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const theses = await watchlistService.getWatchlistTheses(id);
+      res.json({ success: true, data: theses });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 export const watchlistHandler = new WatchlistHandler();
+
