@@ -24,9 +24,13 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
   const [marketState, setMarketState] = useState<WsMarketState | null>(null);
   const [lastTickId, setLastTickId] = useState<number>(0);
 
+  const symbolsRef = useRef<string[]>(symbols);
+  symbolsRef.current = symbols;
+
   const lastSeenTickIdRef = useRef<number>(0);
   const reconnectAttemptsRef = useRef<number>(0);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const staleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isComponentMounted = useRef<boolean>(true);
 
   // Sync active symbols into Zustand store
@@ -35,9 +39,11 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
   const setTickInStore = useWatchlistStore((s) => s.setTick);
   const addSignalInStore = useWatchlistStore((s) => s.addSignal);
 
+  const symbolsKey = symbols.slice().sort().join(',');
+
   useEffect(() => {
     setActiveSymbolsInStore(symbols);
-  }, [symbols, setActiveSymbolsInStore]);
+  }, [symbolsKey, setActiveSymbolsInStore]);
 
   const processTick = useCallback(
     (tick: WsTick) => {
@@ -98,14 +104,22 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
       sseSource.current.close();
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    const sseUrl = `${apiUrl}/api/v1/market/stream-sse?symbols=${encodeURIComponent(symbols.join(','))}`;
+    const currentSyms = symbolsRef.current;
+    const apiUrl =
+      typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')
+        ? 'https://veritas-backend-6epf.onrender.com'
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const sseUrl = `${apiUrl}/api/v1/market/stream-sse?symbols=${encodeURIComponent(currentSyms.join(','))}`;
 
     try {
       const source = new EventSource(sseUrl);
 
       source.onopen = () => {
         setConnected(true);
+        if (staleTimerRef.current) {
+          clearTimeout(staleTimerRef.current);
+          staleTimerRef.current = null;
+        }
         setStale(false);
       };
 
@@ -135,7 +149,11 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
       });
 
       source.onerror = () => {
-        setStale(true);
+        if (!staleTimerRef.current) {
+          staleTimerRef.current = setTimeout(() => {
+            setStale(true);
+          }, 10000);
+        }
         source.close();
       };
 
@@ -143,7 +161,7 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
     } catch (e) {
       console.warn('SSE fallback failed to initialize:', e);
     }
-  }, [symbols, processTick, processSignal]);
+  }, [processTick, processSignal]);
 
   const connect = useCallback(() => {
     if (!isComponentMounted.current) return;
@@ -167,6 +185,10 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
 
       socket.onopen = () => {
         setConnected(true);
+        if (staleTimerRef.current) {
+          clearTimeout(staleTimerRef.current);
+          staleTimerRef.current = null;
+        }
         setStale(false);
         reconnectAttemptsRef.current = 0;
 
@@ -175,12 +197,13 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
         socket.send(JSON.stringify({ action: 'auth', userId }));
 
         // 2. Subscribe to current watchlist symbols (triggers instant snapshot)
-        if (symbols.length > 0) {
-          socket.send(JSON.stringify({ action: 'subscribe', symbols }));
+        const currentSyms = symbolsRef.current;
+        if (currentSyms.length > 0) {
+          socket.send(JSON.stringify({ action: 'subscribe', symbols: currentSyms }));
         }
 
         // 3. Reconcile catch-up ticks if reconnecting after a gap
-        performCatchup(symbols);
+        performCatchup(currentSyms);
       };
 
       socket.onmessage = (event) => {
@@ -206,12 +229,25 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
 
       socket.onclose = () => {
         setConnected(false);
-        setStale(true);
+        // Only mark stale if disconnected for more than 10 seconds
+        if (!staleTimerRef.current) {
+          staleTimerRef.current = setTimeout(() => {
+            if (isComponentMounted.current && !connected) {
+              setStale(true);
+            }
+          }, 10000);
+        }
         scheduleReconnect();
       };
 
       socket.onerror = () => {
-        setStale(true);
+        if (!staleTimerRef.current) {
+          staleTimerRef.current = setTimeout(() => {
+            if (isComponentMounted.current && !connected) {
+              setStale(true);
+            }
+          }, 10000);
+        }
       };
 
       ws.current = socket;
@@ -219,7 +255,7 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
       console.error('WebSocket connection attempt error:', err);
       scheduleReconnect();
     }
-  }, [symbols, performCatchup, processTick, processSignal, setTicksInStore]);
+  }, [performCatchup, processTick, processSignal, setTicksInStore]);
 
   const scheduleReconnect = useCallback(() => {
     if (!isComponentMounted.current) return;
@@ -242,6 +278,7 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
     }, jitter);
   }, [connect, connectSSE]);
 
+  // Initial connection only on mount (does NOT close/reconnect on symbol changes)
   useEffect(() => {
     isComponentMounted.current = true;
     connect();
@@ -249,17 +286,18 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
     return () => {
       isComponentMounted.current = false;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
       if (ws.current) ws.current.close();
       if (sseSource.current) sseSource.current.close();
     };
   }, [connect]);
 
-  // Handle dynamic symbol list changes without full reconnect
+  // Dynamically update subscriptions over existing open WebSocket without closing
   useEffect(() => {
     if (ws.current?.readyState === WebSocket.OPEN && symbols.length > 0) {
       ws.current.send(JSON.stringify({ action: 'subscribe', symbols }));
     }
-  }, [symbols]);
+  }, [symbolsKey]);
 
   return {
     ticks,

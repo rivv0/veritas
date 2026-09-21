@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Target, Check, X, Edit3 } from 'lucide-react';
 import { getCurrencySymbol } from '@/lib/formatters';
+import { updateWatchlistThesis } from '@/lib/api';
 
 interface Props {
   watchlistId: string;
@@ -42,15 +43,7 @@ export function ThesisPopover({
     setSaving(true);
     try {
       const priceVal = hasAnchor ? parsedPrice : undefined;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      await fetch(
-        `${apiUrl}/api/v1/watchlists/${watchlistId}/symbols/${symbol}/thesis`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thesis, thesisPrice: priceVal }),
-        }
-      );
+      await updateWatchlistThesis(watchlistId, symbol, thesis, priceVal);
       onSave?.(thesis, priceVal);
       setIsOpen(false);
     } catch (err) {

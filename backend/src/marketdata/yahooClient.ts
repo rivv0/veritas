@@ -291,8 +291,74 @@ export class YahooClient {
         continue;
       }
     }
-    console.warn(`[Yahoo-Stats] Failed to fetch 20-day volume for ${cleanSym} (${ticker})`);
     return null;
+  }
+
+  private historicalClosesCache: Map<string, { data: number[]; expiresAt: number }> = new Map();
+
+  async fetchHistoricalCloses(symbol: string): Promise<number[]> {
+    if (this.isRateLimited()) {
+      return [];
+    }
+
+    const cleanSym = symbol.trim().toUpperCase();
+    const cached = this.historicalClosesCache.get(cleanSym);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const ticker = this.getYahooTicker(cleanSym);
+    const session = await this.getSession();
+    const crumbParam = session ? `&crumb=${encodeURIComponent(session.crumb)}` : '';
+    const headers: Record<string, string> = {
+      'User-Agent': DEFAULT_UA,
+      Accept: 'application/json',
+    };
+    if (session) {
+      headers['Cookie'] = session.cookie;
+    }
+
+    for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+      try {
+        await this.throttle();
+        const url = `https://${host}/v8/finance/chart/${encodeURIComponent(
+          ticker
+        )}?interval=1d&range=1y${crumbParam}`;
+
+        const response = await fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            this.rateLimitedUntil = Date.now() + 60000;
+            break;
+          }
+          continue;
+        }
+
+        const json: any = await response.json();
+        const result = json?.chart?.result?.[0];
+        if (!result) continue;
+
+        const rawCloses: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
+        const validCloses = rawCloses.filter(
+          (c): c is number => typeof c === 'number' && !isNaN(c) && c > 0
+        );
+
+        if (validCloses.length >= 2) {
+          this.historicalClosesCache.set(cleanSym, {
+            data: validCloses,
+            expiresAt: Date.now() + 6 * 60 * 60 * 1000, // 6 hours
+          });
+          return validCloses;
+        }
+      } catch (err: any) {
+        continue;
+      }
+    }
+    return [];
   }
 
   private synthesizeIntradayCurve(open: number, high: number, low: number, close: number, ltp: number, points = 24): number[] {

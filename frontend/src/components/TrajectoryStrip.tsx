@@ -1,7 +1,7 @@
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import type { TrajectoryData } from '@/lib/types';
+import { fetchTrajectory } from '@/lib/api';
 
 interface Props {
   symbol: string;
@@ -12,9 +12,7 @@ export function TrajectoryStrip({ symbol }: Props) {
 
   useEffect(() => {
     let isMounted = true;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-    fetch(`${apiUrl}/api/v1/market/trajectory?symbol=${symbol}`)
-      .then((res) => res.json())
+    fetchTrajectory(symbol)
       .then((res) => {
         if (isMounted && res.success && res.data) {
           setData(res.data);

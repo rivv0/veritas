@@ -4,6 +4,7 @@ services:
     name: veritas-backend
     runtime: node
     plan: free
+    branch: adv
     rootDir: backend
     buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npm start
@@ -20,6 +21,7 @@ services:
     name: veritas-frontend
     runtime: node
     plan: free
+    branch: adv
     rootDir: frontend
     buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npm start

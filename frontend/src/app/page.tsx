@@ -62,7 +62,7 @@ export default function VeritasDashboard() {
   } = useDigest(activeWatchlistId);
   const { ticks, signals, connected, stale } = useWebSocket(activeSymbols);
 
-  const isEffectiveStale = stale || simulateStale;
+  const isEffectiveStale = simulateStale || (stale && !connected);
 
   useEffect(() => {
     if (activeSymbols.length === 0) {
@@ -220,9 +220,6 @@ export default function VeritasDashboard() {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-4">
-        {/* Terminal-Grade Market Breadth Ribbon (Computed purely in Zustand store) */}
-        <MarketBreadthBar />
-
         {/* Watchlist Tabs Bar */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 gap-2">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5">
@@ -281,6 +278,9 @@ export default function VeritasDashboard() {
                   }}
                 />
                 
+                {/* Market Breadth & Regime Meter (Positioned directly below the Watchlist) */}
+                <MarketBreadthBar />
+
                 {/* Live News Section for Shortlisted Stocks */}
                 <WatchlistNewsFeed symbols={activeSymbols} />
               </>
