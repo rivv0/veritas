@@ -252,6 +252,9 @@ export default function VeritasDashboard() {
           </div>
         </div>
 
+        {/* Terminal-Grade Market Breadth Ribbon (Just after the list of watchlists) */}
+        <MarketBreadthBar />
+
         {/* Dashboard Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
           {/* Main Left Column: Realtime Watchlist Table & Shortlist News */}
@@ -277,9 +280,6 @@ export default function VeritasDashboard() {
                     setShowAlertModal(true);
                   }}
                 />
-                
-                {/* Market Breadth & Regime Meter (Positioned directly below the Watchlist) */}
-                <MarketBreadthBar />
 
                 {/* Live News Section for Shortlisted Stocks */}
                 <WatchlistNewsFeed symbols={activeSymbols} />
