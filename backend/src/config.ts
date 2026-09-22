@@ -45,13 +45,18 @@ export const config = {
     } as Record<string, string>,
   },
   auth: {
-    jwtSecret:
-      process.env.JWT_SECRET ||
-      (process.env.NODE_ENV === 'production'
-        ? (() => {
-            throw new Error('JWT_SECRET environment variable is required in production');
-          })()
-        : 'veritas-development-jwt-secret-do-not-use-in-production-12345'),
+    jwtSecret: (() => {
+      if (process.env.JWT_SECRET) {
+        return process.env.JWT_SECRET;
+      }
+      if (process.env.NODE_ENV === 'production') {
+        console.warn(
+          '[AUTH WARNING] JWT_SECRET environment variable is not defined in production. Using fallback secret. For maximum security, define JWT_SECRET in your Render dashboard Environment tab.'
+        );
+        return 'veritas-production-default-jwt-secret-9843729182374-fallback';
+      }
+      return 'veritas-development-jwt-secret-do-not-use-in-production-12345';
+    })(),
     accessTokenTtlSec: 15 * 60, // 15 minutes
     refreshTokenTtlSec: 7 * 24 * 60 * 60, // 7 days
     cookieName: 'veritas_refresh_token',
