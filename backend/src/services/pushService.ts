@@ -1,20 +1,27 @@
 import webpush from 'web-push';
 import { pushRepository } from '../repositories/pushRepository';
 
-// Development default VAPID keys (overridable via environment variables)
-const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || 'UUxI4M3vC1Y6c9T-NqB-V5M6V5M6V5M6V5M6V5M6V5M';
+// VAPID keys loaded from environment variables or generated securely at runtime
+// Eliminates any committed private key strings flagged by security/secret scanners
+const vapidKeys =
+  process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY
+    ? {
+        publicKey: process.env.VAPID_PUBLIC_KEY,
+        privateKey: process.env.VAPID_PRIVATE_KEY,
+      }
+    : webpush.generateVAPIDKeys();
+
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:alerts@veritas.market';
 
 try {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  webpush.setVapidDetails(VAPID_SUBJECT, vapidKeys.publicKey, vapidKeys.privateKey);
 } catch (err: any) {
   console.warn('[PushService] VAPID initialization warning:', err.message || err);
 }
 
 export class PushService {
   getPublicKey(): string {
-    return VAPID_PUBLIC;
+    return vapidKeys.publicKey;
   }
 
   async sendToUser(
