@@ -25,7 +25,10 @@ services:
     rootDir: frontend
     buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
+      - key: PORT
+        value: 3000
       - key: NEXT_PUBLIC_API_URL
         value: https://veritas-backend-6epf.onrender.com
       - key: NEXT_PUBLIC_WS_URL
