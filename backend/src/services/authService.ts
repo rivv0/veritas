@@ -260,6 +260,102 @@ export class AuthService {
       throw authErr;
     }
   }
+
+  async requestPasswordReset(email: string): Promise<{
+    success: boolean;
+    message: string;
+    resetCode?: string;
+    expiresInMinutes: number;
+  }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('Please provide a valid email address');
+    }
+
+    const user = await userRepository.findUserByEmail(cleanEmail);
+    if (!user) {
+      // Prevent user enumeration: return generic success message
+      return {
+        success: true,
+        message: 'If an account exists with this email address, a password reset code has been sent.',
+        expiresInMinutes: 15,
+      };
+    }
+
+    if (!user.passwordHash) {
+      const err: any = new Error('This account was registered via OAuth. Please sign in using your OAuth provider.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Generate 6-digit code for high usability
+    const resetCode = crypto.randomInt(100000, 999999).toString();
+    const tokenHash = this.hashToken(`${cleanEmail}:${resetCode}`);
+    const tokenId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    await userRepository.createPasswordResetToken({
+      id: tokenId,
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    });
+
+    console.log(`[VERITAS Auth] Password reset requested for ${cleanEmail}. Verification Code: ${resetCode}`);
+
+    return {
+      success: true,
+      message: 'Password reset verification code generated.',
+      resetCode,
+      expiresInMinutes: 15,
+    };
+  }
+
+  async resetPassword(dto: {
+    email: string;
+    token: string;
+    newPassword: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const rawToken = dto.token.trim();
+
+    if (!cleanEmail || !rawToken) {
+      throw new Error('Email and reset code are required');
+    }
+
+    if (!dto.newPassword || dto.newPassword.length < 8) {
+      throw new Error('Password must be at least 8 characters long');
+    }
+    if (!/[A-Za-z]/.test(dto.newPassword) || !/[0-9]/.test(dto.newPassword)) {
+      throw new Error('Password must contain at least one letter and one number');
+    }
+
+    const user = await userRepository.findUserByEmail(cleanEmail);
+    if (!user) {
+      const err: any = new Error('Invalid or expired password reset code');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const tokenHash = this.hashToken(`${cleanEmail}:${rawToken}`);
+    const resetRecord = await userRepository.findValidPasswordResetToken(tokenHash);
+
+    if (!resetRecord || resetRecord.userId !== user.id) {
+      const err: any = new Error('Invalid or expired password reset code. Please request a new one.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 12);
+    // updatePasswordHash increments token_version to revoke all active sessions across all devices
+    await userRepository.updatePasswordHash(user.id, newPasswordHash);
+    await userRepository.markPasswordResetTokenUsed(resetRecord.id);
+
+    return {
+      success: true,
+      message: 'Password has been reset successfully. Please sign in with your new password.',
+    };
+  }
 }
 
 export const authService = new AuthService();

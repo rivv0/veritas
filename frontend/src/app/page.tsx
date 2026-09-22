@@ -139,24 +139,24 @@ export default function VeritasDashboard() {
 
           <div className="flex items-center gap-2">
             {/* Real-time Status Badge */}
-            <div className={`flex items-center gap-2 px-2.5 py-1 bg-zinc-950 border text-[11px] font-mono rounded-none ${
+            <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 bg-zinc-950 border text-[10px] sm:text-[11px] font-mono rounded-none ${
               isEffectiveStale ? 'border-amber-700/80 text-amber-400' : 'border-zinc-800 text-zinc-200'
             }`}>
               <span className={`w-1.5 h-1.5 ${isEffectiveStale ? 'bg-amber-400 animate-ping' : connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
               <span className="font-bold">
-                {isEffectiveStale ? 'FEED STALLED' : connected ? 'FEED ONLINE' : 'DISCONNECTED'}
+                {isEffectiveStale ? 'FEED STALLED' : connected ? 'LIVE' : 'OFFLINE'}
               </span>
-              <span className="text-zinc-400 text-[10px]">
+              <span className="text-zinc-400 text-[9px] sm:text-[10px] hidden xs:inline">
                 {isEffectiveStale ? '35s lag' : '12ms'}
               </span>
             </div>
 
-            {/* Web Push Notification Arming */}
+            {/* Desktop Web Push Notification Arming */}
             {pushSupported && (
               <button
                 onClick={() => subscribePush()}
                 disabled={pushLoading || pushSubscribed}
-                className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border transition-colors flex items-center gap-1.5 ${
+                className={`hidden md:inline-flex px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border transition-colors items-center gap-1.5 ${
                   pushSubscribed
                     ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800 cursor-default'
                     : 'bg-zinc-950 text-zinc-300 hover:text-white border-zinc-800 hover:bg-zinc-900'
@@ -168,24 +168,24 @@ export default function VeritasDashboard() {
               </button>
             )}
 
-            {/* Price Alerts Center */}
+            {/* Desktop Price Alerts Center */}
             <button
               onClick={() => {
                 setAlertSymbol(activeSymbols[0] || 'GROWW');
                 setAlertPrice(undefined);
                 setShowAlertModal(true);
               }}
-              className="px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5"
+              className="hidden md:inline-flex px-2.5 py-1 text-[10px] font-mono font-bold rounded-none border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-300 hover:text-white transition-colors items-center gap-1.5"
               title="Open Price & Market-Condition Alerts"
             >
               <Bell size={12} />
               <span>ALERTS</span>
             </button>
 
-            {/* Test Stale / Delayed Data Simulation Toggle */}
+            {/* Desktop Test Stale / Delayed Data Simulation Toggle */}
             <button
               onClick={() => setSimulateStale(!simulateStale)}
-              className={`px-2 py-1 text-[10px] font-mono font-bold rounded-none border transition-colors ${
+              className={`hidden md:inline-flex px-2 py-1 text-[10px] font-mono font-bold rounded-none border transition-colors ${
                 simulateStale
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 hover:bg-amber-500/30'
                   : 'bg-zinc-950 text-zinc-400 hover:text-white border-zinc-800 hover:bg-zinc-900'
@@ -195,9 +195,10 @@ export default function VeritasDashboard() {
               {simulateStale ? '● Simulating Delay' : 'Simulate Delay'}
             </button>
 
+            {/* Desktop Refresh Digest */}
             <button
               onClick={() => refreshDigest()}
-              className="p-1.5 border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors rounded-none"
+              className="hidden md:inline-flex p-1.5 border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors rounded-none"
               title="Refresh Digest"
             >
               <RefreshCw size={14} className={loadingDigest ? 'animate-spin' : ''} />
@@ -209,28 +210,83 @@ export default function VeritasDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Dedicated Mobile Quick-Actions Toolbar (Clean, Touch-Friendly 38px tap targets) */}
+        <div className="md:hidden border-t border-zinc-900 bg-[#080c14] px-3 py-1.5 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar touch-pan-x">
+          <div className="flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar">
+            {/* Mobile Alerts */}
+            <button
+              onClick={() => {
+                setAlertSymbol(activeSymbols[0] || 'GROWW');
+                setAlertPrice(undefined);
+                setShowAlertModal(true);
+              }}
+              className="px-2.5 py-1 text-[11px] font-mono font-bold rounded-none border border-zinc-800 bg-zinc-950 text-zinc-300 flex items-center gap-1.5 whitespace-nowrap active:bg-zinc-800"
+            >
+              <Bell size={13} className="text-amber-400" />
+              <span>ALERTS</span>
+            </button>
+
+            {/* Mobile Push */}
+            {pushSupported && (
+              <button
+                onClick={() => subscribePush()}
+                disabled={pushLoading || pushSubscribed}
+                className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-none border flex items-center gap-1.5 whitespace-nowrap active:bg-zinc-800 ${
+                  pushSubscribed
+                    ? 'bg-emerald-950/50 text-emerald-300 border-emerald-800'
+                    : 'bg-zinc-950 text-zinc-300 border-zinc-800'
+                }`}
+              >
+                {pushSubscribed ? <BellRing size={13} className="text-emerald-400" /> : <Bell size={13} />}
+                <span>{pushSubscribed ? 'PUSH ON' : pushLoading ? 'ARMING...' : 'ARM PUSH'}</span>
+              </button>
+            )}
+
+            {/* Mobile Delay Toggle */}
+            <button
+              onClick={() => setSimulateStale(!simulateStale)}
+              className={`px-2 py-1 text-[11px] font-mono font-bold rounded-none border transition-colors whitespace-nowrap ${
+                simulateStale
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                  : 'bg-zinc-950 text-zinc-400 border-zinc-800'
+              }`}
+            >
+              {simulateStale ? '● Delayed' : 'Test Delay'}
+            </button>
+          </div>
+
+          {/* Mobile Refresh Digest */}
+          <button
+            onClick={() => refreshDigest()}
+            className="p-1.5 border border-zinc-800 bg-zinc-950 text-zinc-300 active:bg-zinc-800 transition-colors shrink-0"
+            title="Refresh Digest"
+          >
+            <RefreshCw size={13} className={loadingDigest ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </header>
 
       {/* Non-intrusive Guest Conversion Ribbon */}
       {!user && !dismissGuestBanner && (
-        <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-950/80 to-zinc-950 border-b border-emerald-800/30 py-1.5 px-4 text-xs flex items-center justify-between text-zinc-300">
-          <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-950/80 to-zinc-950 border-b border-emerald-800/30 py-2 px-4 text-xs text-zinc-300">
+          <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>
-                <strong>Guest Workspace:</strong> Your custom watchlists & alerts are currently stored on this browser only.
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span className="leading-snug">
+                <strong>Guest Workspace:</strong> Custom watchlists & alerts stored on this device.
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-end sm:self-auto">
               <button
                 onClick={() => openAuthModal('signup')}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+                className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer text-xs"
               >
                 Register Free to Sync
               </button>
               <button
                 onClick={() => setDismissGuestBanner(true)}
-                className="text-zinc-500 hover:text-zinc-300 text-sm leading-none p-1 cursor-pointer"
+                className="text-zinc-500 hover:text-zinc-300 text-base leading-none p-1 cursor-pointer"
                 title="Dismiss"
               >
                 ×
@@ -243,19 +299,18 @@ export default function VeritasDashboard() {
       {/* Stale / Delayed Data Notification Banner */}
       {isEffectiveStale && (
         <div className="bg-amber-950/40 border-b border-amber-800/80 text-amber-200 text-xs font-mono py-2 px-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.2 bg-amber-900 text-amber-100 font-bold text-[9px] uppercase">
+              <span className="px-1.5 py-0.2 bg-amber-900 text-amber-100 font-bold text-[9px] uppercase shrink-0">
                 Data Latency Protocol
               </span>
-              <span>
+              <span className="leading-snug">
                 Market feed delay detected (&gt;15s). Displaying last verified prices from TimescaleDB hypertable.
-                Outlier signals quarantined to prevent conflicting execution.
               </span>
             </div>
             <button
               onClick={() => setSimulateStale(false)}
-              className="underline text-[11px] text-amber-300 hover:text-white shrink-0"
+              className="underline text-[11px] text-amber-300 hover:text-white shrink-0 self-end sm:self-auto"
             >
               Dismiss
             </button>
@@ -264,10 +319,11 @@ export default function VeritasDashboard() {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-4">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-5 space-y-4">
         {/* Watchlist Tabs Bar */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5 gap-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5 touch-pan-x">
+
             <Layers size={15} className="text-zinc-500 mr-1 hidden sm:block shrink-0" />
             {watchlists.map((wl) => {
               const isActive = activeWatchlist?.id === wl.id;

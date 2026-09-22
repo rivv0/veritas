@@ -333,6 +333,49 @@ export async function revokeAllSessions(): Promise<{ success: boolean; message: 
   });
 }
 
+export async function forgotPassword(email: string): Promise<{
+  success: boolean;
+  message: string;
+  resetCode?: string;
+  expiresInMinutes: number;
+}> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-veritas-client': 'web',
+    },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to request password reset');
+  }
+  return data;
+}
+
+export async function resetPassword(dto: {
+  email: string;
+  token: string;
+  newPassword: string;
+}): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/reset-password`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-veritas-client': 'web',
+    },
+    body: JSON.stringify(dto),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to reset password');
+  }
+  return data;
+}
+
 export const api = {
   fetchWatchlists,
   createWatchlist,
@@ -361,4 +404,6 @@ export const api = {
   logout,
   getMe,
   revokeAllSessions,
+  forgotPassword,
+  resetPassword,
 };

@@ -158,6 +158,55 @@ export class UserRepository {
     // 3. Retire guest session
     await query(`DELETE FROM user_sessions WHERE user_id = $1`, [guestDeviceId]);
   }
+
+  async createPasswordResetToken(data: {
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    const sql = `
+      INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+      VALUES ($1, $2, $3, $4)
+    `;
+    await query(sql, [data.id, data.userId, data.tokenHash, data.expiresAt]);
+  }
+
+  async findValidPasswordResetToken(tokenHash: string): Promise<{
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    usedAt: Date | null;
+    createdAt: Date;
+  } | null> {
+    const sql = `
+      SELECT id, user_id as "userId", token_hash as "tokenHash", expires_at as "expiresAt", used_at as "usedAt", created_at as "createdAt"
+      FROM password_reset_tokens
+      WHERE token_hash = $1 AND expires_at > NOW() AND used_at IS NULL
+    `;
+    const rows = await query<any>(sql, [tokenHash]);
+    if (!rows || rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      userId: r.userId || r.user_id,
+      tokenHash: r.tokenHash || r.token_hash,
+      expiresAt: new Date(r.expiresAt || r.expires_at),
+      usedAt: r.usedAt || r.used_at ? new Date(r.usedAt || r.used_at) : null,
+      createdAt: new Date(r.createdAt || r.created_at),
+    };
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    const sql = `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`;
+    await query(sql, [id]);
+  }
+
+  async updatePasswordHash(userId: string, newPasswordHash: string): Promise<void> {
+    const sql = `UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = NOW() WHERE id = $2`;
+    await query(sql, [newPasswordHash, userId]);
+  }
 }
 
 export const userRepository = new UserRepository();

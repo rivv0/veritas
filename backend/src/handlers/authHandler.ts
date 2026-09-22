@@ -215,3 +215,43 @@ export async function revokeAllSessionsHandler(req: AuthenticatedRequest, res: R
     });
   }
 }
+
+export async function forgotPasswordHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: 'Bad Request', message: 'Email address is required' });
+      return;
+    }
+    const result = await authService.requestPasswordReset(email);
+    res.status(200).json(result);
+  } catch (err: any) {
+    const statusCode = err.statusCode || 400;
+    res.status(statusCode).json({
+      error: 'Password Reset Request Failed',
+      message: err.message || 'Failed to process password reset',
+    });
+  }
+}
+
+export async function resetPasswordHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const { email, token, newPassword } = req.body;
+    if (!email || !token || !newPassword) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Email, reset code, and new password are required',
+      });
+      return;
+    }
+    const result = await authService.resetPassword({ email, token, newPassword });
+    clearRefreshTokenCookie(res);
+    res.status(200).json(result);
+  } catch (err: any) {
+    const statusCode = err.statusCode || 400;
+    res.status(statusCode).json({
+      error: 'Password Reset Failed',
+      message: err.message || 'Failed to reset password',
+    });
+  }
+}

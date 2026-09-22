@@ -52,8 +52,8 @@ export function CreateWatchlistModal({ isOpen, onClose, onCreate }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-100 font-sans">
-      <div className="w-full max-w-md bg-[#09090b] border border-zinc-700 rounded-none p-5 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-100 font-sans">
+      <div className="w-full max-w-md bg-[#09090b] border border-zinc-700 rounded-none p-4 sm:p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-white text-black rounded-none font-mono">

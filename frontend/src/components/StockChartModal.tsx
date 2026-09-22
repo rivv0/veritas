@@ -193,8 +193,8 @@ export function StockChartModal({
     : '#71717a';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#09090b] border border-zinc-700 w-full max-w-2xl shadow-[0_12px_50px_rgba(0,0,0,0.95)] rounded-none overflow-hidden space-y-4 p-5 text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
+      <div className="bg-[#09090b] border border-zinc-700 w-full max-w-2xl shadow-[0_12px_50px_rgba(0,0,0,0.95)] rounded-none max-h-[92vh] overflow-y-auto space-y-4 p-4 sm:p-5 text-zinc-100">
         
         {/* Header Bar */}
         <div className="flex items-start justify-between pb-3 border-b border-zinc-800">
@@ -326,7 +326,7 @@ export function StockChartModal({
           <div className="relative w-full overflow-hidden">
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="w-full h-52 overflow-visible"
+              className="w-full h-44 sm:h-52 overflow-visible"
               onMouseMove={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const mouseX = ((e.clientX - rect.left) / rect.width) * chartWidth;

@@ -189,7 +189,7 @@ describe('VERITAS Production Authentication Engine', () => {
     });
   });
 
-  describe('Rate Limiter Sliding Window', () => {
+  describe('Rate Limiter Sliding Window & Reverse Proxy Parsing', () => {
     it('enforces request limit and returns 429 when max requests exceeded', () => {
       const limiter = createRateLimiter({
         windowMs: 1000,
@@ -230,6 +230,123 @@ describe('VERITAS Production Authentication Engine', () => {
       expect(statusCode).toBe(429);
       expect(jsonPayload?.error).toBe('Too Many Requests');
       expect(headerVal).toBeDefined();
+    });
+
+    it('correctly parses comma-separated x-forwarded-for header behind reverse proxies', () => {
+      const limiter = createRateLimiter({
+        windowMs: 1000,
+        maxRequests: 2,
+      });
+
+      const mockReqA = { headers: { 'x-forwarded-for': '198.51.100.1, 10.0.0.1' }, socket: {} } as any;
+      const mockReqB = { headers: { 'x-forwarded-for': '198.51.100.2, 10.0.0.1' }, socket: {} } as any;
+
+      let nextCallsA = 0;
+      let nextCallsB = 0;
+
+      limiter(mockReqA, {} as any, () => { nextCallsA++; });
+      limiter(mockReqA, {} as any, () => { nextCallsA++; });
+
+      // Client B has different client IP even though proxy IP is the same
+      limiter(mockReqB, {} as any, () => { nextCallsB++; });
+      expect(nextCallsA).toBe(2);
+      expect(nextCallsB).toBe(1);
+    });
+  });
+
+  describe('Password Reset Flow (Forgot Password)', () => {
+    const resetUserEmail = `reset_trader_${Date.now()}@example.com`;
+    const initialPassword = 'InitialPassword123!';
+    const newPassword = 'NewSecretPassword456!';
+
+    it('generates a 6-digit verification reset code for an existing user', async () => {
+      await authService.signup({
+        email: resetUserEmail,
+        password: initialPassword,
+        name: 'Reset Test Trader',
+      });
+
+      const res = await authService.requestPasswordReset(resetUserEmail);
+      expect(res.success).toBe(true);
+      expect(res.resetCode).toBeDefined();
+      expect(res.resetCode?.length).toBe(6);
+      expect(res.expiresInMinutes).toBe(15);
+    });
+
+    it('returns generic message without leaking account existence for non-existent email', async () => {
+      const res = await authService.requestPasswordReset('nobody_exists_here_999@example.com');
+      expect(res.success).toBe(true);
+      expect(res.resetCode).toBeUndefined();
+      expect(res.message).toMatch(/If an account exists/i);
+    });
+
+    it('rejects reset with invalid code or weak password', async () => {
+      await expect(
+        authService.resetPassword({
+          email: resetUserEmail,
+          token: '999999', // wrong code
+          newPassword,
+        })
+      ).rejects.toThrow(/Invalid or expired password reset code/i);
+
+      await expect(
+        authService.resetPassword({
+          email: resetUserEmail,
+          token: '123456',
+          newPassword: 'short',
+        })
+      ).rejects.toThrow(/at least 8 characters/i);
+    });
+
+    it('successfully resets password, allows login with new password, and revokes old sessions', async () => {
+      // 1. Log in with initial password to get an active session
+      const oldSession = await authService.login({
+        email: resetUserEmail,
+        password: initialPassword,
+      });
+      expect(oldSession.accessToken).toBeDefined();
+
+      // 2. Request reset code
+      const requestRes = await authService.requestPasswordReset(resetUserEmail);
+      const resetCode = requestRes.resetCode!;
+
+      // 3. Reset password
+      const resetRes = await authService.resetPassword({
+        email: resetUserEmail,
+        token: resetCode,
+        newPassword,
+      });
+      expect(resetRes.success).toBe(true);
+
+      // 4. Old password can no longer log in
+      await expect(
+        authService.login({
+          email: resetUserEmail,
+          password: initialPassword,
+        })
+      ).rejects.toThrow(/Invalid email or password/i);
+
+      // 5. New password logs in successfully
+      const newSession = await authService.login({
+        email: resetUserEmail,
+        password: newPassword,
+      });
+      expect(newSession.user.email).toBe(resetUserEmail.toLowerCase());
+      expect(newSession.accessToken).toBeDefined();
+
+      // 6. Old session's access token is revoked
+      await expect(authService.verifyAccessToken(oldSession.accessToken)).rejects.toThrow(
+        /Token has been revoked/i
+      );
+
+      // 7. Reusing the same reset code again is rejected (one-time use)
+      await expect(
+        authService.resetPassword({
+          email: resetUserEmail,
+          token: resetCode,
+          newPassword: 'AnotherPassword789!',
+        })
+      ).rejects.toThrow(/Invalid or expired password reset code/i);
     });
   });
 });

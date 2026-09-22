@@ -28,8 +28,13 @@ export function createRateLimiter(options: {
   }
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const clientKey = Array.isArray(ip) ? ip[0] : String(ip);
+    const forwarded = req.headers['x-forwarded-for'];
+    const clientIp = typeof forwarded === 'string'
+      ? forwarded.split(',')[0].trim()
+      : Array.isArray(forwarded)
+      ? forwarded[0].trim()
+      : req.ip || req.socket.remoteAddress || 'unknown';
+    const clientKey = String(clientIp);
 
     const now = Date.now();
     let record = store.get(clientKey);
@@ -57,9 +62,9 @@ export function createRateLimiter(options: {
   };
 }
 
-// 5 requests per 15 minutes for sensitive auth endpoints
+// 25 requests per 15 minutes for sensitive auth endpoints (prevents false-positive lockouts behind reverse proxies)
 export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  maxRequests: 5,
-  message: 'Too many authentication attempts. Please wait 15 minutes before trying again.',
+  maxRequests: 25,
+  message: 'Too many authentication attempts. Please wait a few minutes before trying again.',
 });

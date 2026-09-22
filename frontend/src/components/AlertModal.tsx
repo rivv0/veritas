@@ -138,8 +138,8 @@ export function AlertModal({
   const curr = getCurrencySymbol(symbol);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
-      <div className="bg-[#09090b] border border-zinc-700 w-full max-w-xl shadow-[0_12px_50px_rgba(0,0,0,0.95)] rounded-none overflow-hidden text-zinc-100 divide-y divide-zinc-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans">
+      <div className="bg-[#09090b] border border-zinc-700 w-full max-w-xl shadow-[0_12px_50px_rgba(0,0,0,0.95)] rounded-none max-h-[92vh] overflow-y-auto text-zinc-100 divide-y divide-zinc-800">
         
         {/* Modal Header */}
         <div className="p-4 flex items-center justify-between">

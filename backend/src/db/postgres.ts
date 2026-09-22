@@ -58,6 +58,14 @@ const memoryStore = {
     replaced_by: string | null;
     created_at: Date;
   }[],
+  password_reset_tokens: [] as {
+    id: string;
+    user_id: string;
+    token_hash: string;
+    expires_at: Date;
+    used_at: Date | null;
+    created_at: Date;
+  }[],
   alerts: [] as any[],
   push_subscriptions: [] as any[],
   watchlists: [
@@ -730,11 +738,21 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
   }
 
   if (cleanSql.includes('UPDATE users') && cleanSql.includes('token_version = token_version + 1')) {
-    const [userId] = params;
-    const user = memoryStore.users.find(u => u.id === userId);
-    if (user) {
-      user.token_version = (user.token_version || 0) + 1;
-      user.updated_at = new Date();
+    if (cleanSql.includes('password_hash = $1')) {
+      const [passwordHash, userId] = params;
+      const user = memoryStore.users.find(u => u.id === userId);
+      if (user) {
+        user.password_hash = passwordHash;
+        user.token_version = (user.token_version || 0) + 1;
+        user.updated_at = new Date();
+      }
+    } else {
+      const [userId] = params;
+      const user = memoryStore.users.find(u => u.id === userId);
+      if (user) {
+        user.token_version = (user.token_version || 0) + 1;
+        user.updated_at = new Date();
+      }
     }
     return [] as any;
   }
@@ -832,6 +850,48 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
     return [] as any;
   }
 
+  // 13. Password Reset Tokens
+  if (cleanSql.includes('INSERT INTO password_reset_tokens')) {
+    const [id, userId, tokenHash, expiresAt] = params;
+    memoryStore.password_reset_tokens.push({
+      id,
+      user_id: userId,
+      token_hash: tokenHash,
+      expires_at: new Date(expiresAt),
+      used_at: null,
+      created_at: new Date(),
+    });
+    return [] as any;
+  }
+
+  if (cleanSql.includes('FROM password_reset_tokens')) {
+    if (cleanSql.includes('WHERE token_hash = $1')) {
+      const [tokenHash] = params;
+      const now = Date.now();
+      const token = memoryStore.password_reset_tokens.find(
+        t => t.token_hash === tokenHash && t.used_at === null && t.expires_at.getTime() > now
+      );
+      if (!token) return [];
+      return [{
+        id: token.id,
+        userId: token.user_id,
+        tokenHash: token.token_hash,
+        expiresAt: token.expires_at,
+        usedAt: token.used_at,
+        createdAt: token.created_at,
+      }] as any;
+    }
+  }
+
+  if (cleanSql.includes('UPDATE password_reset_tokens') && cleanSql.includes('SET used_at = NOW()')) {
+    const [id] = params;
+    const token = memoryStore.password_reset_tokens.find(t => t.id === id);
+    if (token) {
+      token.used_at = new Date();
+    }
+    return [] as any;
+  }
+
   return [] as any;
 }
 
@@ -872,6 +932,16 @@ export async function initPostgresSchema() {
         );
         CREATE INDEX IF NOT EXISTS idx_refresh_family ON user_refresh_tokens(family_id);
         CREATE INDEX IF NOT EXISTS idx_refresh_user ON user_refresh_tokens(user_id);
+
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash VARCHAR(255) NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_hash);
         CREATE TABLE IF NOT EXISTS watchlists (
             id VARCHAR(64) PRIMARY KEY,
             user_id VARCHAR(64) NOT NULL,

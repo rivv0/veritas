@@ -14,6 +14,8 @@ import {
   logoutHandler,
   meHandler,
   revokeAllSessionsHandler,
+  forgotPasswordHandler,
+  resetPasswordHandler,
 } from './handlers/authHandler';
 import { authRateLimiter } from './middleware/rateLimiter';
 import { watchlistHandler } from './handlers/watchlistHandler';
@@ -24,6 +26,7 @@ import { sseHandler } from './handlers/sseHandler';
 import { marketDataService } from './services/marketDataService';
 
 export const app = express();
+app.set('trust proxy', 1);
 
 app.use(
   cors({
@@ -55,6 +58,8 @@ app.get('/health', (req, res) => {
 // Authentication API Routes
 app.post('/api/v1/auth/signup', authRateLimiter, signupHandler);
 app.post('/api/v1/auth/login', authRateLimiter, loginHandler);
+app.post('/api/v1/auth/forgot-password', authRateLimiter, forgotPasswordHandler);
+app.post('/api/v1/auth/reset-password', authRateLimiter, resetPasswordHandler);
 app.post('/api/v1/auth/refresh', csrfProtection, refreshHandler);
 app.post('/api/v1/auth/logout', csrfProtection, logoutHandler);
 app.get('/api/v1/auth/me', requireAuth, meHandler);

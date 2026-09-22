@@ -328,7 +328,7 @@ export function WatchlistTable({
         {/* L1/L2/L3 & Structure Micro-Filter Row */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-zinc-900">
           {/* L1 / L2 / L3 Tiers */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar touch-pan-x">
             <span className="text-[10px] text-zinc-500 mr-1 uppercase">Tier:</span>
             {(['ALL', 'L1', 'L2', 'L3'] as const).map((t) => (
               <button
@@ -346,7 +346,7 @@ export function WatchlistTable({
           </div>
 
           {/* Market Structure Chips */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar touch-pan-x">
             <span className="text-[10px] text-zinc-500 mr-1 uppercase">Structure:</span>
             {[
               { id: 'ALL', label: 'ALL' },
@@ -379,9 +379,163 @@ export function WatchlistTable({
         </div>
       </div>
 
-      {/* Table Content */}
-      <div className="overflow-x-auto">
+      {/* Mobile-Friendly Stock Cards View (<640px) */}
+      <div className="block sm:hidden divide-y divide-zinc-800 bg-black">
+        {filteredAndSortedSymbols.map((symbol) => {
+          const snap = getSnapshotForSymbol(symbol);
+          const tick = ticks[symbol];
+          const symbolSignals = getSignalsForSymbol(symbol);
+          const struct = snap?.structure;
+          const fallbackPrice = snap?.ltp ?? 1000;
+          const fallbackChange = snap?.changePercent ?? 0;
+
+          return (
+            <div
+              key={symbol}
+              className="p-3 bg-zinc-950 space-y-2.5 font-mono text-xs border-b border-zinc-900"
+            >
+              {/* Top row: Symbol, Name, Badges & Price */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => onInspectSymbol?.(symbol)}
+                      className="text-sm font-bold text-white hover:underline text-left cursor-pointer"
+                    >
+                      {symbol}
+                    </button>
+                    {symbol === 'GROWW' && (
+                      <span className="px-1 py-0.2 text-[8px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 uppercase">
+                        ★ HONORARY
+                      </span>
+                    )}
+                    {struct?.tier && (
+                      <span className="px-1 py-0.2 text-[8px] font-bold bg-zinc-900 text-zinc-300 border border-zinc-700 uppercase">
+                        {struct.tier}
+                      </span>
+                    )}
+                    {struct?.isDeadCatBounce && (
+                      <button
+                        onClick={() => onInspectSymbol?.(symbol)}
+                        className="px-1.5 py-0.2 text-[8px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/60 animate-pulse uppercase"
+                      >
+                        ⚠ TRAP RALLY
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-zinc-400 font-sans truncate mt-0.5">
+                    {getStockName(symbol)}
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <RealtimePrice
+                    symbol={symbol}
+                    tick={tick}
+                    fallbackPrice={fallbackPrice}
+                    fallbackChange={fallbackChange}
+                  />
+                </div>
+              </div>
+
+              {/* Middle row: Trajectory & Telemetry */}
+              <div className="space-y-1.5 pt-1.5 border-t border-zinc-900">
+                <div className="flex items-center justify-between gap-1 text-[10px]">
+                  {struct && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className={`px-1 py-0.2 border ${
+                        struct.rsiState === 'OVERBOUGHT'
+                          ? 'bg-amber-950/60 text-amber-400 border-amber-800'
+                          : struct.rsiState === 'OVERSOLD'
+                          ? 'bg-cyan-950/60 text-cyan-400 border-cyan-800'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                      }`}>
+                        RSI {struct.rsi}
+                      </span>
+                      <span className={`px-1 py-0.2 border ${
+                        struct.emaState === 'ABOVE_EMA'
+                          ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
+                          : struct.emaState === 'BELOW_EMA'
+                          ? 'bg-red-950/60 text-red-400 border-red-800'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                      }`}>
+                        {struct.emaState === 'ABOVE_EMA' ? '> 20-EMA' : struct.emaState === 'BELOW_EMA' ? '< 20-EMA' : '≈ 20-EMA'}
+                      </span>
+                    </div>
+                  )}
+                  <ThesisPopover
+                    watchlistId={watchlist.id}
+                    symbol={symbol}
+                    currentPrice={tick?.ltp ?? fallbackPrice}
+                    initialThesis={thesesMap[symbol.toUpperCase()]?.thesis ?? snap?.thesis}
+                    initialPrice={thesesMap[symbol.toUpperCase()]?.thesisPrice ?? snap?.thesisPrice}
+                    onSave={(t, p) => updateStoreThesis(symbol, t, p)}
+                  />
+                </div>
+
+                {/* Trajectory Strip */}
+                <TrajectoryStrip symbol={symbol} />
+
+                {/* Signals */}
+                {symbolSignals.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-0.5">
+                    {symbolSignals.map((sig, sIdx) => (
+                      <SignalBadge
+                        key={sIdx}
+                        type={sig.signalType}
+                        severity={sig.severity}
+                        description={sig.description}
+                        symbol={symbol}
+                        metadata={sig.metadata}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Actions Row: Big Touch Targets */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-zinc-900 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onInspectSymbol?.(symbol)}
+                    className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 flex items-center gap-1 cursor-pointer rounded-none active:bg-zinc-800"
+                  >
+                    <BarChart2 size={12} className={struct?.isDeadCatBounce ? 'text-amber-400' : 'text-zinc-400'} />
+                    <span>Chart</span>
+                  </button>
+
+                  <button
+                    onClick={() => onSetAlert?.(symbol, tick?.ltp ?? fallbackPrice)}
+                    className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 flex items-center gap-1 cursor-pointer rounded-none active:bg-zinc-800"
+                  >
+                    <Bell size={12} className="text-amber-400" />
+                    <span>Alert</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => onRemoveSymbol(symbol)}
+                  className="p-1 text-zinc-500 hover:text-red-400 hover:bg-zinc-900 border border-transparent transition-colors cursor-pointer"
+                  title="Remove from list"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredAndSortedSymbols.length === 0 && (
+          <div className="py-8 text-center text-zinc-500 font-mono text-xs">
+            <p>No symbols match filters.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table Content (hidden on mobile, table layout on sm+) */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
+
           <thead>
             <tr className="border-b border-zinc-800 text-zinc-400 text-[10px] font-mono font-bold uppercase tracking-wider">
               <th className="py-2.5 px-2 w-8 text-center"></th>

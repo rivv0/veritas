@@ -8,11 +8,11 @@ interface AuthState {
   isLoading: boolean;
   isInitialized: boolean;
   authModalOpen: boolean;
-  authModalMode: 'login' | 'signup';
+  authModalMode: 'login' | 'signup' | 'forgot';
 
   setAuth: (user: UserPublicProfile, accessToken: string) => void;
   clearAuth: () => void;
-  openAuthModal: (mode?: 'login' | 'signup') => void;
+  openAuthModal: (mode?: 'login' | 'signup' | 'forgot') => void;
   closeAuthModal: () => void;
   initAuth: () => Promise<void>;
   logout: () => Promise<void>;
