@@ -21,12 +21,14 @@ import type { MarketSnapshot } from '@/lib/types';
 import { TrendingUp, RefreshCw, Layers, Plus, Zap, Bell, BellRing } from 'lucide-react';
 
 export default function VeritasDashboard() {
-  const { user, initAuth, openAuthModal } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const initAuth = useAuthStore((s) => s.initAuth);
+  const openAuthModal = useAuthStore((s) => s.openAuthModal);
   const [dismissGuestBanner, setDismissGuestBanner] = useState(false);
 
   useEffect(() => {
     initAuth();
-  }, [initAuth]);
+  }, []);
   const {
     watchlists,
     activeWatchlist,
