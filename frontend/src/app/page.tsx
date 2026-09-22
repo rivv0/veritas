@@ -14,10 +14,19 @@ import { SignalToast } from '@/components/SignalToast';
 import { StockChartModal } from '@/components/StockChartModal';
 import { MarketBreadthBar } from '@/components/MarketBreadthBar';
 import { AlertModal } from '@/components/AlertModal';
+import { UserProfileMenu } from '@/components/UserProfileMenu';
+import { AuthModal } from '@/components/AuthModal';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { MarketSnapshot } from '@/lib/types';
 import { TrendingUp, RefreshCw, Layers, Plus, Zap, Bell, BellRing } from 'lucide-react';
 
 export default function VeritasDashboard() {
+  const { user, initAuth, openAuthModal } = useAuthStore();
+  const [dismissGuestBanner, setDismissGuestBanner] = useState(false);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
   const {
     watchlists,
     activeWatchlist,
@@ -191,9 +200,43 @@ export default function VeritasDashboard() {
             >
               <RefreshCw size={14} className={loadingDigest ? 'animate-spin' : ''} />
             </button>
+
+            {/* User Profile / Auth Control */}
+            <div className="pl-1 border-l border-zinc-800 ml-1">
+              <UserProfileMenu />
+            </div>
           </div>
         </div>
       </header>
+
+      {/* Non-intrusive Guest Conversion Ribbon */}
+      {!user && !dismissGuestBanner && (
+        <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-950/80 to-zinc-950 border-b border-emerald-800/30 py-1.5 px-4 text-xs flex items-center justify-between text-zinc-300">
+          <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>
+                <strong>Guest Workspace:</strong> Your custom watchlists & alerts are currently stored on this browser only.
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+              >
+                Register Free to Sync
+              </button>
+              <button
+                onClick={() => setDismissGuestBanner(true)}
+                className="text-zinc-500 hover:text-zinc-300 text-sm leading-none p-1 cursor-pointer"
+                title="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stale / Delayed Data Notification Banner */}
       {isEffectiveStale && (
@@ -331,6 +374,8 @@ export default function VeritasDashboard() {
         tick={inspectSymbol ? ticks[inspectSymbol] : undefined}
         signals={signals.filter((s) => s.symbol === inspectSymbol)}
       />
+
+      <AuthModal />
     </div>
   );
 }

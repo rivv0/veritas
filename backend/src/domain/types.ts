@@ -2,7 +2,39 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  passwordHash?: string | null;
+  tokenVersion: number;
+  role: 'trader' | 'admin';
+  avatarUrl?: string | null;
   createdAt: Date;
+  updatedAt?: Date;
+}
+
+export interface UserPublicProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: 'trader' | 'admin';
+  avatarUrl?: string | null;
+  createdAt: Date;
+}
+
+export interface RefreshTokenRecord {
+  id: string;
+  familyId: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  revokedAt?: Date | null;
+  replacedBy?: string | null;
+  createdAt: Date;
+}
+
+export interface JwtPayload {
+  sub: string;
+  email: string;
+  role: string;
+  tokenVersion: number;
 }
 
 export interface Watchlist {

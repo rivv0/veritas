@@ -36,8 +36,28 @@ let nextTickId = 1000;
 // In-Memory Storage Arrays
 const memoryStore = {
   users: [
-    { id: 'demo-user', email: 'trader@groww.in', name: 'Pro Trader', created_at: new Date() }
+    {
+      id: 'demo-user',
+      email: 'trader@groww.in',
+      name: 'Pro Trader',
+      password_hash: null as string | null,
+      token_version: 0,
+      role: 'trader',
+      avatar_url: null as string | null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
   ],
+  user_refresh_tokens: [] as {
+    id: string;
+    family_id: string;
+    user_id: string;
+    token_hash: string;
+    expires_at: Date;
+    revoked_at: Date | null;
+    replaced_by: string | null;
+    created_at: Date;
+  }[],
   alerts: [] as any[],
   push_subscriptions: [] as any[],
   watchlists: [
@@ -639,6 +659,179 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
     }
   }
 
+  // 10. Users Table & Authentication
+  if (cleanSql.includes('FROM users')) {
+    if (cleanSql.includes('WHERE email = $1')) {
+      const [email] = params;
+      const user = memoryStore.users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+      if (!user) return [];
+      return [{
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        passwordHash: user.password_hash,
+        tokenVersion: user.token_version,
+        role: user.role,
+        avatarUrl: user.avatar_url,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+      }] as any;
+    }
+    if (cleanSql.includes('WHERE id = $1')) {
+      const [id] = params;
+      const user = memoryStore.users.find(u => u.id === id);
+      if (!user) return [];
+      return [{
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        passwordHash: user.password_hash,
+        tokenVersion: user.token_version,
+        role: user.role,
+        avatarUrl: user.avatar_url,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+      }] as any;
+    }
+  }
+
+  if (cleanSql.includes('INSERT INTO users')) {
+    const [id, email, name, passwordHash, tokenVersion, role, avatarUrl] = params;
+    const existing = memoryStore.users.find(u => u.id === id || u.email.toLowerCase() === (email || '').toLowerCase());
+    if (existing) {
+      if (cleanSql.includes('ON CONFLICT (id) DO NOTHING')) {
+        return [] as any;
+      }
+      throw new Error('User with this email already exists');
+    }
+    const newUser = {
+      id,
+      email,
+      name,
+      password_hash: passwordHash || null,
+      token_version: tokenVersion !== undefined ? Number(tokenVersion) : 0,
+      role: role || 'trader',
+      avatar_url: avatarUrl || null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    memoryStore.users.push(newUser);
+    return [{
+      id: newUser.id,
+      email: newUser.email,
+      name: newUser.name,
+      passwordHash: newUser.password_hash,
+      tokenVersion: newUser.token_version,
+      role: newUser.role,
+      avatarUrl: newUser.avatar_url,
+      createdAt: newUser.created_at,
+      updatedAt: newUser.updated_at,
+    }] as any;
+  }
+
+  if (cleanSql.includes('UPDATE users') && cleanSql.includes('token_version = token_version + 1')) {
+    const [userId] = params;
+    const user = memoryStore.users.find(u => u.id === userId);
+    if (user) {
+      user.token_version = (user.token_version || 0) + 1;
+      user.updated_at = new Date();
+    }
+    return [] as any;
+  }
+
+  // 11. User Refresh Tokens (with Family ID & Atomic Rotation)
+  if (cleanSql.includes('INSERT INTO user_refresh_tokens')) {
+    const [id, familyId, userId, tokenHash, expiresAt] = params;
+    memoryStore.user_refresh_tokens.push({
+      id,
+      family_id: familyId,
+      user_id: userId,
+      token_hash: tokenHash,
+      expires_at: new Date(expiresAt),
+      revoked_at: null,
+      replaced_by: null,
+      created_at: new Date(),
+    });
+    return [] as any;
+  }
+
+  // Atomic claim: UPDATE user_refresh_tokens SET revoked_at = NOW(), replaced_by = $2 WHERE token_hash = $1 AND revoked_at IS NULL RETURNING *
+  if (cleanSql.includes('UPDATE user_refresh_tokens') && cleanSql.includes('revoked_at IS NULL')) {
+    const [tokenHash, replacedBy] = params;
+    const token = memoryStore.user_refresh_tokens.find(t => t.token_hash === tokenHash && t.revoked_at === null);
+    if (token) {
+      token.revoked_at = new Date();
+      token.replaced_by = replacedBy;
+      return [{
+        id: token.id,
+        familyId: token.family_id,
+        userId: token.user_id,
+        tokenHash: token.token_hash,
+        expiresAt: token.expires_at,
+        revokedAt: token.revoked_at,
+        replacedBy: token.replaced_by,
+        createdAt: token.created_at,
+      }] as any;
+    }
+    return [] as any; // 0 rows updated -> reuse or not found
+  }
+
+  if (cleanSql.includes('FROM user_refresh_tokens')) {
+    if (cleanSql.includes('WHERE token_hash = $1')) {
+      const [tokenHash] = params;
+      const token = memoryStore.user_refresh_tokens.find(t => t.token_hash === tokenHash);
+      if (!token) return [];
+      return [{
+        id: token.id,
+        familyId: token.family_id,
+        userId: token.user_id,
+        tokenHash: token.token_hash,
+        expiresAt: token.expires_at,
+        revokedAt: token.revoked_at,
+        replacedBy: token.replaced_by,
+        createdAt: token.created_at,
+      }] as any;
+    }
+  }
+
+  if (cleanSql.includes('UPDATE user_refresh_tokens') && cleanSql.includes('WHERE family_id = $1')) {
+    const [familyId] = params;
+    memoryStore.user_refresh_tokens.forEach(t => {
+      if (t.family_id === familyId && !t.revoked_at) {
+        t.revoked_at = new Date();
+      }
+    });
+    return [] as any;
+  }
+
+  // 12. Re-keying Watchlists & Alerts for Guest Migration
+  if (cleanSql.includes('UPDATE watchlists') && cleanSql.includes('SET user_id = $1 WHERE user_id = $2')) {
+    const [newUserId, guestDeviceId] = params;
+    memoryStore.watchlists.forEach(w => {
+      if (w.user_id === guestDeviceId) {
+        w.user_id = newUserId;
+        w.updated_at = new Date();
+      }
+    });
+    return [] as any;
+  }
+
+  if (cleanSql.includes('UPDATE alerts') && cleanSql.includes('SET user_id = $1 WHERE user_id = $2')) {
+    const [newUserId, guestDeviceId] = params;
+    memoryStore.alerts.forEach(a => {
+      if (a.user_id === guestDeviceId) {
+        a.user_id = newUserId;
+      }
+    });
+    return [] as any;
+  }
+
+  if (cleanSql.includes('DELETE FROM user_sessions WHERE user_id = $1')) {
+    const [userId] = params;
+    memoryStore.user_sessions = memoryStore.user_sessions.filter(s => s.user_id !== userId);
+    return [] as any;
+  }
+
   return [] as any;
 }
 
@@ -654,8 +847,31 @@ export async function initPostgresSchema() {
             id VARCHAR(64) PRIMARY KEY,
             email VARCHAR(255) UNIQUE NOT NULL,
             name VARCHAR(255) NOT NULL,
+            password_hash VARCHAR(255),
+            token_version INT NOT NULL DEFAULT 0,
+            role VARCHAR(32) NOT NULL DEFAULT 'trader',
+            avatar_url VARCHAR(512),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0;
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(32) NOT NULL DEFAULT 'trader';
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512);
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+        CREATE TABLE IF NOT EXISTS user_refresh_tokens (
+            id VARCHAR(64) PRIMARY KEY,
+            family_id VARCHAR(64) NOT NULL,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash VARCHAR(255) NOT NULL UNIQUE,
+            expires_at TIMESTAMPTZ NOT NULL,
+            revoked_at TIMESTAMPTZ,
+            replaced_by VARCHAR(64),
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE INDEX IF NOT EXISTS idx_refresh_family ON user_refresh_tokens(family_id);
+        CREATE INDEX IF NOT EXISTS idx_refresh_user ON user_refresh_tokens(user_id);
         CREATE TABLE IF NOT EXISTS watchlists (
             id VARCHAR(64) PRIMARY KEY,
             user_id VARCHAR(64) NOT NULL,

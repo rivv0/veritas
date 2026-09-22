@@ -1,0 +1,235 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { authService } from '../src/services/authService';
+import { userRepository } from '../src/repositories/userRepository';
+import { watchlistRepository } from '../src/repositories/watchlistRepository';
+import { createRateLimiter } from '../src/middleware/rateLimiter';
+
+describe('VERITAS Production Authentication Engine', () => {
+  const testEmail = `trader_${Date.now()}@example.com`;
+  const testPassword = 'SecurePassword123!';
+  const testName = 'Veritas Trader';
+
+  describe('User Signup & Validation', () => {
+    it('successfully signs up a new user with bcrypt hash, JWT, and refresh token', async () => {
+      const result = await authService.signup({
+        email: testEmail,
+        password: testPassword,
+        name: testName,
+      });
+
+      expect(result.user).toBeDefined();
+      expect(result.user.email).toBe(testEmail.toLowerCase());
+      expect(result.user.name).toBe(testName);
+      expect(result.user.role).toBe('trader');
+      expect((result.user as any).passwordHash).toBeUndefined(); // passwordHash not exposed in public profile
+      expect(result.accessToken).toBeTypeOf('string');
+      expect(result.rawRefreshToken).toBeTypeOf('string');
+      expect(result.rawRefreshToken.length).toBeGreaterThan(30);
+
+      // Verify access token
+      const verified = await authService.verifyAccessToken(result.accessToken);
+      expect(verified.id).toBe(result.user.id);
+      expect(verified.email).toBe(testEmail.toLowerCase());
+    });
+
+    it('rejects duplicate email signup with 409 conflict', async () => {
+      await expect(
+        authService.signup({
+          email: testEmail,
+          password: 'AnotherPassword456!',
+          name: 'Imposter',
+        })
+      ).rejects.toThrow(/already exists/i);
+    });
+
+    it('rejects weak password under 8 characters', async () => {
+      await expect(
+        authService.signup({
+          email: 'weak@example.com',
+          password: 'pass1',
+          name: 'Weak Pass',
+        })
+      ).rejects.toThrow(/at least 8 characters/i);
+    });
+
+    it('rejects password without numbers', async () => {
+      await expect(
+        authService.signup({
+          email: 'nonum@example.com',
+          password: 'allletterslongpassword',
+          name: 'No Number',
+        })
+      ).rejects.toThrow(/contain at least one letter and one number/i);
+    });
+  });
+
+  describe('User Login & OAuth Guard', () => {
+    it('successfully logs in with correct email and password', async () => {
+      const result = await authService.login({
+        email: testEmail,
+        password: testPassword,
+      });
+
+      expect(result.user.email).toBe(testEmail.toLowerCase());
+      expect(result.accessToken).toBeTypeOf('string');
+      expect(result.rawRefreshToken).toBeTypeOf('string');
+    });
+
+    it('rejects login with incorrect password', async () => {
+      await expect(
+        authService.login({
+          email: testEmail,
+          password: 'WrongPassword999!',
+        })
+      ).rejects.toThrow(/Invalid email or password/i);
+    });
+
+    it('rejects login for nonexistent email', async () => {
+      await expect(
+        authService.login({
+          email: 'nonexistent@example.com',
+          password: 'SomePassword123!',
+        })
+      ).rejects.toThrow(/Invalid email or password/i);
+    });
+
+    it('OAuth Guard: rejects password login for accounts with null passwordHash', async () => {
+      const oauthUserId = `oauth-user-${Date.now()}`;
+      const oauthEmail = `oauth_${Date.now()}@example.com`;
+      await userRepository.createUser({
+        id: oauthUserId,
+        email: oauthEmail,
+        name: 'OAuth Trader',
+        passwordHash: null,
+      });
+
+      await expect(
+        authService.login({
+          email: oauthEmail,
+          password: 'AnyPassword123!',
+        })
+      ).rejects.toThrow(/registered via OAuth/i);
+    });
+  });
+
+  describe('Refresh Token Rotation & Family Reuse Detection', () => {
+    it('successfully rotates refresh token on valid presentation', async () => {
+      const loginRes = await authService.login({
+        email: testEmail,
+        password: testPassword,
+      });
+
+      const rotated = await authService.rotateRefreshToken(loginRes.rawRefreshToken);
+      expect(rotated.accessToken).toBeTypeOf('string');
+      expect(rotated.rawRefreshToken).toBeTypeOf('string');
+      expect(rotated.rawRefreshToken).not.toBe(loginRes.rawRefreshToken);
+
+      // Verify the new access token works
+      const verified = await authService.verifyAccessToken(rotated.accessToken);
+      expect(verified.email).toBe(testEmail.toLowerCase());
+    });
+
+    it('CRITICAL: detects token reuse, revokes family, and invalidates user sessions', async () => {
+      // 1. User logs in -> gets Token A
+      const loginRes = await authService.login({
+        email: testEmail,
+        password: testPassword,
+      });
+      const tokenA = loginRes.rawRefreshToken;
+
+      // 2. Legitimate rotation: Token A -> Token B
+      const rotate1 = await authService.rotateRefreshToken(tokenA);
+      const tokenB = rotate1.rawRefreshToken;
+
+      // 3. Legitimate rotation: Token B -> Token C
+      const rotate2 = await authService.rotateRefreshToken(tokenB);
+      const tokenC = rotate2.rawRefreshToken;
+
+      // 4. ATTACK: Attacker presents already-rotated Token A!
+      await expect(authService.rotateRefreshToken(tokenA)).rejects.toThrow(
+        /Refresh token reuse detected. All sessions revoked for security/i
+      );
+
+      // 5. Verify family was destroyed: presenting Token C is now rejected
+      await expect(authService.rotateRefreshToken(tokenC)).rejects.toThrow(
+        /Refresh token reuse detected|Invalid or expired refresh token/i
+      );
+
+      // 6. Verify existing access tokens issued before revocation are now rejected (token_version incremented)
+      await expect(authService.verifyAccessToken(rotate2.accessToken)).rejects.toThrow(
+        /Token has been revoked/i
+      );
+    });
+  });
+
+  describe('Guest Migration & Deduplication', () => {
+    it('migrates guest watchlists, alerts, and retires guest session upon signup', async () => {
+      const guestDeviceId = `guest-device-${Date.now()}`;
+      
+      // Guest creates custom watchlist
+      const customWatchlist = await watchlistRepository.create(guestDeviceId, 'My Guest Alpha');
+      await watchlistRepository.addSymbol(customWatchlist.id, 'NVDA');
+
+      // Guest signs up
+      const signupEmail = `migrated_${Date.now()}@example.com`;
+      const signupRes = await authService.signup({
+        email: signupEmail,
+        password: 'MigratedPass123!',
+        name: 'Migrated User',
+        guestDeviceId,
+      });
+
+      // Verify watchlists now belong to signupRes.user.id
+      const userWatchlists = await watchlistRepository.findByUserId(signupRes.user.id);
+      expect(userWatchlists.some(w => w.name === 'My Guest Alpha')).toBe(true);
+
+      // Verify guest device has 0 watchlists left
+      const oldGuestWatchlists = await watchlistRepository.findByUserId(guestDeviceId);
+      expect(oldGuestWatchlists.length).toBe(0);
+    });
+  });
+
+  describe('Rate Limiter Sliding Window', () => {
+    it('enforces request limit and returns 429 when max requests exceeded', () => {
+      const limiter = createRateLimiter({
+        windowMs: 1000,
+        maxRequests: 3,
+        message: 'Rate limit test hit',
+      });
+
+      const mockReq = { ip: '127.0.0.99', headers: {}, socket: {} } as any;
+      let statusCode = 200;
+      let jsonPayload: any = null;
+      let headerVal: string | null = null;
+
+      const mockRes = {
+        status: (code: number) => {
+          statusCode = code;
+          return {
+            json: (data: any) => { jsonPayload = data; },
+          };
+        },
+        setHeader: (name: string, val: string) => {
+          if (name === 'Retry-After') headerVal = val;
+        },
+      } as any;
+
+      let nextCalls = 0;
+      const next = () => { nextCalls++; };
+
+      // First 3 calls should pass
+      limiter(mockReq, mockRes, next);
+      limiter(mockReq, mockRes, next);
+      limiter(mockReq, mockRes, next);
+      expect(nextCalls).toBe(3);
+      expect(statusCode).toBe(200);
+
+      // 4th call should be blocked
+      limiter(mockReq, mockRes, next);
+      expect(nextCalls).toBe(3);
+      expect(statusCode).toBe(429);
+      expect(jsonPayload?.error).toBe('Too Many Requests');
+      expect(headerVal).toBeDefined();
+    });
+  });
+});

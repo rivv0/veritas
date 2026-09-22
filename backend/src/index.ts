@@ -1,9 +1,21 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { wsManager } from './websocket';
-import { mockAuthMiddleware } from './handlers/authHandler';
+import {
+  jwtAuthMiddleware,
+  requireAuth,
+  csrfProtection,
+  signupHandler,
+  loginHandler,
+  refreshHandler,
+  logoutHandler,
+  meHandler,
+  revokeAllSessionsHandler,
+} from './handlers/authHandler';
+import { authRateLimiter } from './middleware/rateLimiter';
 import { watchlistHandler } from './handlers/watchlistHandler';
 import { marketHandler } from './handlers/marketHandler';
 import { alertHandler } from './handlers/alertHandler';
@@ -11,15 +23,42 @@ import { pushHandler } from './handlers/pushHandler';
 import { sseHandler } from './handlers/sseHandler';
 import { marketDataService } from './services/marketDataService';
 
-const app = express();
-app.use(cors());
+export const app = express();
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (config.auth.corsOrigins.includes(origin) || config.auth.corsOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      if (origin.endsWith('.onrender.com') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Device-Fp', 'X-User-Id', 'X-Veritas-Client'],
+  })
+);
+
+app.use(cookieParser());
 app.use(express.json());
-app.use(mockAuthMiddleware);
+app.use(jwtAuthMiddleware);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Authentication API Routes
+app.post('/api/v1/auth/signup', authRateLimiter, signupHandler);
+app.post('/api/v1/auth/login', authRateLimiter, loginHandler);
+app.post('/api/v1/auth/refresh', csrfProtection, refreshHandler);
+app.post('/api/v1/auth/logout', csrfProtection, logoutHandler);
+app.get('/api/v1/auth/me', requireAuth, meHandler);
+app.post('/api/v1/auth/revoke-all', requireAuth, revokeAllSessionsHandler);
 
 // Watchlist API Routes
 app.get('/api/v1/watchlists', (req, res) => watchlistHandler.getWatchlists(req, res));
@@ -58,7 +97,7 @@ app.delete('/api/v1/alerts/:id', (req, res) => alertHandler.deleteAlert(req, res
 app.get('/api/v1/push/vapid-key', (req, res) => pushHandler.getVapidKey(req, res));
 app.post('/api/v1/push/subscribe', (req, res) => pushHandler.subscribe(req, res));
 
-const server = http.createServer(app);
+export const server = http.createServer(app);
 
 
 import { initPostgresSchema } from './db/postgres';

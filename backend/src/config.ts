@@ -44,4 +44,23 @@ export const config = {
       'META': 'QQQ',
     } as Record<string, string>,
   },
+  auth: {
+    jwtSecret:
+      process.env.JWT_SECRET ||
+      (process.env.NODE_ENV === 'production'
+        ? (() => {
+            throw new Error('JWT_SECRET environment variable is required in production');
+          })()
+        : 'veritas-development-jwt-secret-do-not-use-in-production-12345'),
+    accessTokenTtlSec: 15 * 60, // 15 minutes
+    refreshTokenTtlSec: 7 * 24 * 60 * 60, // 7 days
+    cookieName: 'veritas_refresh_token',
+    corsOrigins: [
+      'https://veritas-frontend.onrender.com',
+      'https://veritas-frontend-6epf.onrender.com',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+    ],
+  },
 };

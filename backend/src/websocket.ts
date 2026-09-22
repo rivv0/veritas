@@ -1,11 +1,14 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { redisSub, redisHotState } from './db/redis';
+import { authService } from './services/authService';
+import { UserPublicProfile } from './domain/types';
 
 interface ClientConnection {
   ws: WebSocket;
   subscriptions: Set<string>;
   userId?: string;
+  user?: UserPublicProfile;
 }
 
 interface BufferedTick {
@@ -23,19 +26,65 @@ export class WebSocketManager {
   private ringBufferTtlMs = 5000;
 
   init(server: Server) {
-    this.wss = new WebSocketServer({ server, path: '/ws/v1/market' });
+    this.wss = new WebSocketServer({ noServer: true });
 
-    this.wss.on('connection', (ws: WebSocket) => {
-      const client: ClientConnection = { ws, subscriptions: new Set() };
+    server.on('upgrade', async (request, socket, head) => {
+      try {
+        const host = request.headers.host || 'localhost';
+        const url = new URL(request.url || '', `http://${host}`);
+
+        if (url.pathname !== '/ws/v1/market') {
+          return;
+        }
+
+        const token = url.searchParams.get('token');
+        let authUser: UserPublicProfile | undefined = undefined;
+
+        if (token) {
+          try {
+            authUser = await authService.verifyAccessToken(token);
+          } catch (err: any) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+        }
+
+        this.wss!.handleUpgrade(request, socket, head, (ws) => {
+          this.wss!.emit('connection', ws, request, authUser);
+        });
+      } catch (err) {
+        socket.destroy();
+      }
+    });
+
+    this.wss.on('connection', (ws: WebSocket, _request: any, authUser?: UserPublicProfile) => {
+      const client: ClientConnection = {
+        ws,
+        subscriptions: new Set(),
+        userId: authUser?.id,
+        user: authUser,
+      };
       this.clients.add(client);
-      console.log('WebSocket client connected. Total clients:', this.clients.size);
+      console.log('WebSocket client connected. Total clients:', this.clients.size, authUser ? `(User: ${authUser.email})` : '(Guest)');
 
       ws.on('message', async (message: string) => {
         try {
           const data = JSON.parse(message);
 
-          if (data.action === 'auth' && data.userId) {
-            client.userId = data.userId;
+          if (data.action === 'auth') {
+            if (data.token) {
+              try {
+                const user = await authService.verifyAccessToken(data.token);
+                client.userId = user.id;
+                client.user = user;
+                ws.send(JSON.stringify({ type: 'authenticated', user }));
+              } catch (err: any) {
+                ws.send(JSON.stringify({ type: 'auth_error', message: err.message }));
+              }
+            } else if (data.userId) {
+              client.userId = data.userId;
+            }
           }
 
           if (data.action === 'subscribe' && Array.isArray(data.symbols)) {

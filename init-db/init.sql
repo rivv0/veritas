@@ -10,8 +10,27 @@ CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(64) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
+    token_version INT NOT NULL DEFAULT 0,
+    role VARCHAR(32) NOT NULL DEFAULT 'trader',
+    avatar_url VARCHAR(512),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User Refresh Tokens table (family-based reuse detection & atomic claim rotation)
+CREATE TABLE IF NOT EXISTS user_refresh_tokens (
+    id VARCHAR(64) PRIMARY KEY,
+    family_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    replaced_by VARCHAR(64),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_refresh_family ON user_refresh_tokens(family_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_user ON user_refresh_tokens(user_id);
 
 -- Watchlists table
 CREATE TABLE IF NOT EXISTS watchlists (

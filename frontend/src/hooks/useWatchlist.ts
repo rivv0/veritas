@@ -11,11 +11,13 @@ import {
   removeSymbol,
 } from '@/lib/api';
 import type { Watchlist } from '@/lib/types';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export function useWatchlist() {
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeWatchlist, setActiveWatchlist] = useState<Watchlist | null>(null);
+  const user = useAuthStore((s) => s.user);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ export function useWatchlist() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [user]);
 
   const create = async (name: string) => {
     const res = await createWatchlist(name);

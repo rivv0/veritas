@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { WsTick, WsSignal, WsMarketState } from '@/lib/types';
 import { useWatchlistStore } from '@/store/watchlistStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { getDeviceId, fetchCatchupTicks } from '@/lib/api';
 
 interface WebSocketHookResult {
@@ -17,6 +18,7 @@ interface WebSocketHookResult {
 export function useWebSocket(symbols: string[]): WebSocketHookResult {
   const ws = useRef<WebSocket | null>(null);
   const sseSource = useRef<EventSource | null>(null);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [ticks, setTicks] = useState<Record<string, WsTick>>({});
   const [signals, setSignals] = useState<WsSignal[]>([]);
   const [connected, setConnected] = useState(false);
@@ -180,6 +182,11 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
       }
     }
 
+    if (accessToken) {
+      const sep = wsUrl.includes('?') ? '&' : '?';
+      wsUrl = `${wsUrl}${sep}token=${encodeURIComponent(accessToken)}`;
+    }
+
     try {
       const socket = new WebSocket(wsUrl);
 
@@ -192,9 +199,13 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
         setStale(false);
         reconnectAttemptsRef.current = 0;
 
-        // 1. Authenticate with deviceId for user-targeted price alert push
-        const userId = getDeviceId();
-        socket.send(JSON.stringify({ action: 'auth', userId }));
+        // 1. Authenticate with token or deviceId for user-targeted price alert push
+        if (accessToken) {
+          socket.send(JSON.stringify({ action: 'auth', token: accessToken }));
+        } else {
+          const userId = getDeviceId();
+          socket.send(JSON.stringify({ action: 'auth', userId }));
+        }
 
         // 2. Subscribe to current watchlist symbols (triggers instant snapshot)
         const currentSyms = symbolsRef.current;
@@ -255,7 +266,7 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
       console.error('WebSocket connection attempt error:', err);
       scheduleReconnect();
     }
-  }, [performCatchup, processTick, processSignal, setTicksInStore]);
+  }, [performCatchup, processTick, processSignal, setTicksInStore, accessToken]);
 
   const scheduleReconnect = useCallback(() => {
     if (!isComponentMounted.current) return;

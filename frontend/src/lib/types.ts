@@ -1,3 +1,17 @@
+export interface UserPublicProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: 'trader' | 'admin';
+  avatarUrl?: string | null;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  user: UserPublicProfile;
+  accessToken: string;
+}
+
 export interface Watchlist {
   id: string;
   userId: string;
