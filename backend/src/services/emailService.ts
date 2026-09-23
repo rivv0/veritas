@@ -17,6 +17,7 @@ export class EmailService {
         host: config.email.smtpHost || 'smtp.gmail.com',
         port: config.email.smtpPort || 587,
         secure: isPort465,
+        family: 4, // Force IPv4 to eliminate connect ENETUNREACH on Render
         auth: {
           user: config.email.smtpUser,
           pass: config.email.smtpPass.replace(/\s+/g, ''), // strip spaces if user pasted "abcd efgh ijkl mnop"
@@ -24,7 +25,7 @@ export class EmailService {
         connectionTimeout: 8000,
         greetingTimeout: 8000,
         socketTimeout: 8000,
-      });
+      } as any);
     }
 
     if (config.email.resendApiKey) {

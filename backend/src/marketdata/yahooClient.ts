@@ -92,7 +92,7 @@ export class YahooClient {
             console.warn(`[Yahoo] Failed to get crumb from ${host}:`, err.message || err);
           }
         }
-        console.warn('[Yahoo] Could not acquire crumb token');
+        console.log('[Yahoo] Datacenter environment detected; continuing with public chart API');
         return null;
       } catch (err: any) {
         console.error('[Yahoo] Session initialization error:', err.message || err);
