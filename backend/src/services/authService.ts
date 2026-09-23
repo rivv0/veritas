@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { config } from '../config';
 import { userRepository } from '../repositories/userRepository';
 import { watchlistRepository } from '../repositories/watchlistRepository';
+import { emailService } from './emailService';
 import { User, UserPublicProfile, JwtPayload } from '../domain/types';
 
 export class AuthService {
@@ -305,6 +306,9 @@ export class AuthService {
     });
 
     console.log(`[VERITAS Auth] Password reset requested for ${cleanEmail}. Verification Code: ${resetCode}`);
+
+    // Dispatch verification code email via Resend
+    await emailService.sendPasswordResetEmail(cleanEmail, resetCode);
 
     // In production, never return the reset code in the response body to prevent account takeover
     if (config.env === 'production' || process.env.NODE_ENV === 'production') {

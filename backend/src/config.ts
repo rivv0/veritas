@@ -72,4 +72,8 @@ export const config = {
         : []),
     ],
   },
+  email: {
+    resendApiKey: process.env.RESEND_API_KEY || process.env.resend_api_key || '',
+    fromEmail: process.env.EMAIL_FROM || 'VERITAS <onboarding@resend.dev>',
+  },
 };
