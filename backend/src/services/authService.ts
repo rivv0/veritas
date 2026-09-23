@@ -307,8 +307,10 @@ export class AuthService {
 
     console.log(`[VERITAS Auth] Password reset requested for ${cleanEmail}. Verification Code: ${resetCode}`);
 
-    // Dispatch verification code email via Resend
-    await emailService.sendPasswordResetEmail(cleanEmail, resetCode);
+    // Dispatch verification code email asynchronously so the HTTP response is instantaneous and never hangs
+    emailService.sendPasswordResetEmail(cleanEmail, resetCode).catch((err) => {
+      console.error(`[VERITAS Email] Async email dispatch error for ${cleanEmail}:`, err.message || err);
+    });
 
     // In production, never return the reset code in the response body to prevent account takeover
     if (config.env === 'production' || process.env.NODE_ENV === 'production') {

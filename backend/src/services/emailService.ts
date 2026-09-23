@@ -12,12 +12,18 @@ export class EmailService {
 
   private initTransporters() {
     if (config.email.smtpUser && config.email.smtpPass) {
+      const isPort465 = config.email.smtpPort === 465;
       this.smtpTransporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: config.email.smtpHost || 'smtp.gmail.com',
+        port: config.email.smtpPort || 587,
+        secure: isPort465,
         auth: {
           user: config.email.smtpUser,
           pass: config.email.smtpPass.replace(/\s+/g, ''), // strip spaces if user pasted "abcd efgh ijkl mnop"
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 8000,
       });
     }
 

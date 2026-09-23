@@ -78,7 +78,7 @@ export const config = {
     smtpUser: process.env.SMTP_USER || process.env.smtp_user || '',
     smtpPass: process.env.SMTP_PASS || process.env.smtp_pass || '',
     smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
-    smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
-    smtpSecure: process.env.SMTP_SECURE !== 'false',
+    smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
+    smtpSecure: process.env.SMTP_SECURE === 'true',
   },
 };
