@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
+  env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
   postgres: {
     connectionString: process.env.DATABASE_URL,
@@ -62,10 +63,13 @@ export const config = {
     cookieName: 'veritas_refresh_token',
     corsOrigins: [
       'https://veritas-frontend.onrender.com',
+      'https://veritas-frontend-4x6x.onrender.com',
       'https://veritas-frontend-6epf.onrender.com',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
-      ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+      ...(process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean)
+        : []),
     ],
   },
 };

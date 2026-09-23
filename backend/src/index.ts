@@ -17,7 +17,7 @@ import {
   forgotPasswordHandler,
   resetPasswordHandler,
 } from './handlers/authHandler';
-import { authRateLimiter } from './middleware/rateLimiter';
+import { authRateLimiter, passwordResetRateLimiter } from './middleware/rateLimiter';
 import { watchlistHandler } from './handlers/watchlistHandler';
 import { marketHandler } from './handlers/marketHandler';
 import { alertHandler } from './handlers/alertHandler';
@@ -32,10 +32,12 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
+      // Strictly scope to explicitly configured frontend origins
       if (config.auth.corsOrigins.includes(origin) || config.auth.corsOrigins.includes('*')) {
         return callback(null, true);
       }
-      if (origin.endsWith('.onrender.com') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      // Allow localhost in non-production environments only
+      if (config.env !== 'production' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
@@ -58,8 +60,8 @@ app.get('/health', (req, res) => {
 // Authentication API Routes
 app.post('/api/v1/auth/signup', authRateLimiter, signupHandler);
 app.post('/api/v1/auth/login', authRateLimiter, loginHandler);
-app.post('/api/v1/auth/forgot-password', authRateLimiter, forgotPasswordHandler);
-app.post('/api/v1/auth/reset-password', authRateLimiter, resetPasswordHandler);
+app.post('/api/v1/auth/forgot-password', passwordResetRateLimiter, forgotPasswordHandler);
+app.post('/api/v1/auth/reset-password', passwordResetRateLimiter, resetPasswordHandler);
 app.post('/api/v1/auth/refresh', csrfProtection, refreshHandler);
 app.post('/api/v1/auth/logout', csrfProtection, logoutHandler);
 app.get('/api/v1/auth/me', requireAuth, meHandler);

@@ -82,8 +82,9 @@ export class WebSocketManager {
               } catch (err: any) {
                 ws.send(JSON.stringify({ type: 'auth_error', message: err.message }));
               }
-            } else if (data.userId) {
-              client.userId = data.userId;
+            } else {
+              // Reject unverified userId binding to prevent alert stream spoofing
+              ws.send(JSON.stringify({ type: 'auth_error', message: 'Authentication requires a verified bearer token.' }));
             }
           }
 
@@ -210,7 +211,7 @@ export class WebSocketManager {
     for (const client of this.clients) {
       if (
         client.ws.readyState === WebSocket.OPEN &&
-        (client.subscriptions.size === 0 || client.subscriptions.has(cleanSym))
+        client.subscriptions.has(cleanSym)
       ) {
         client.ws.send(jsonStr);
       }

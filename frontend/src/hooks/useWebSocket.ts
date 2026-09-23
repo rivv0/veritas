@@ -214,12 +214,9 @@ export function useWebSocket(symbols: string[]): WebSocketHookResult {
         setStale(false);
         reconnectAttemptsRef.current = 0;
 
-        // 1. Authenticate with token or deviceId
+        // 1. Authenticate with verified token if signed in
         if (accessTokenRef.current) {
           socket.send(JSON.stringify({ action: 'auth', token: accessTokenRef.current }));
-        } else {
-          const userId = getDeviceId();
-          socket.send(JSON.stringify({ action: 'auth', userId }));
         }
 
         // 2. Subscribe to current watchlist symbols

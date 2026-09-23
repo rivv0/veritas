@@ -884,6 +884,15 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
   }
 
   if (cleanSql.includes('UPDATE password_reset_tokens') && cleanSql.includes('SET used_at = NOW()')) {
+    if (cleanSql.includes('user_id = $1')) {
+      const [userId] = params;
+      for (const token of memoryStore.password_reset_tokens) {
+        if (token.user_id === userId && !token.used_at) {
+          token.used_at = new Date();
+        }
+      }
+      return [] as any;
+    }
     const [id] = params;
     const token = memoryStore.password_reset_tokens.find(t => t.id === id);
     if (token) {

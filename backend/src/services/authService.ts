@@ -288,6 +288,9 @@ export class AuthService {
       throw err;
     }
 
+    // Invalidate any previous unused reset codes for this user
+    await userRepository.invalidateExistingResetTokens(user.id);
+
     // Generate 6-digit code for high usability
     const resetCode = crypto.randomInt(100000, 999999).toString();
     const tokenHash = this.hashToken(`${cleanEmail}:${resetCode}`);
@@ -303,6 +306,16 @@ export class AuthService {
 
     console.log(`[VERITAS Auth] Password reset requested for ${cleanEmail}. Verification Code: ${resetCode}`);
 
+    // In production, never return the reset code in the response body to prevent account takeover
+    if (config.env === 'production' || process.env.NODE_ENV === 'production') {
+      return {
+        success: true,
+        message: 'If an account exists with this email address, a password reset verification code has been sent.',
+        expiresInMinutes: 15,
+      };
+    }
+
+    // Non-production: surface code for local testing and demo
     return {
       success: true,
       message: 'Password reset verification code generated.',

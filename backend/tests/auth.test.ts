@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { authService } from '../src/services/authService';
 import { userRepository } from '../src/repositories/userRepository';
 import { watchlistRepository } from '../src/repositories/watchlistRepository';
-import { createRateLimiter } from '../src/middleware/rateLimiter';
+import { createRateLimiter, authRateLimiter, passwordResetRateLimiter } from '../src/middleware/rateLimiter';
 
 describe('VERITAS Production Authentication Engine', () => {
   const testEmail = `trader_${Date.now()}@example.com`;
@@ -347,6 +347,81 @@ describe('VERITAS Production Authentication Engine', () => {
           newPassword: 'AnotherPassword789!',
         })
       ).rejects.toThrow(/Invalid or expired password reset code/i);
+    });
+
+    it('omits resetCode in API response when NODE_ENV is production (Hole #2 fix)', async () => {
+      const prevEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+        const res = await authService.requestPasswordReset(resetUserEmail);
+        expect(res.success).toBe(true);
+        expect(res.resetCode).toBeUndefined();
+        expect(res.message).toMatch(/If an account exists/i);
+      } finally {
+        process.env.NODE_ENV = prevEnv;
+      }
+    });
+
+    it('invalidates prior unused reset codes when a new code is requested', async () => {
+      // First reset request
+      const req1 = await authService.requestPasswordReset(resetUserEmail);
+      const code1 = req1.resetCode!;
+      expect(code1).toBeDefined();
+
+      // Second reset request (mints a new code, invalidating code1)
+      const req2 = await authService.requestPasswordReset(resetUserEmail);
+      const code2 = req2.resetCode!;
+      expect(code2).toBeDefined();
+      expect(code2).not.toEqual(code1);
+
+      // Attempting to use the invalidated old code1 should fail
+      await expect(
+        authService.resetPassword({
+          email: resetUserEmail,
+          token: code1,
+          newPassword: 'NewUpdatedPassword999!',
+        })
+      ).rejects.toThrow(/Invalid or expired password reset code/i);
+
+      // Using the latest code2 succeeds
+      const resetRes = await authService.resetPassword({
+        email: resetUserEmail,
+        token: code2,
+        newPassword: 'NewUpdatedPassword999!',
+      });
+      expect(resetRes.success).toBe(true);
+    });
+
+    it('rate limits reset requests per-email even when client IP rotates', () => {
+      let blocked = false;
+      const targetEmail = `botnet_target_${Date.now()}@example.com`;
+
+      // 5 requests from 5 distinct IPs against the SAME email
+      for (let i = 1; i <= 5; i++) {
+        const req = {
+          headers: { 'x-forwarded-for': `198.51.100.${i}` },
+          body: { email: targetEmail },
+        } as any;
+        const res = { setHeader: vi.fn(), status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+        passwordResetRateLimiter(req, res, () => {});
+      }
+
+      // 6th request from another fresh IP should be blocked by email-level rate limiting
+      const req6 = {
+        headers: { 'x-forwarded-for': '203.0.113.42' },
+        body: { email: targetEmail },
+      } as any;
+      const res6 = {
+        setHeader: vi.fn(),
+        status: vi.fn().mockImplementation((code) => {
+          if (code === 429) blocked = true;
+          return res6;
+        }),
+        json: vi.fn(),
+      } as any;
+      passwordResetRateLimiter(req6, res6, () => {});
+
+      expect(blocked).toBe(true);
     });
   });
 });

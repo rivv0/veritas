@@ -198,6 +198,11 @@ export class UserRepository {
     };
   }
 
+  async invalidateExistingResetTokens(userId: string): Promise<void> {
+    const sql = `UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL`;
+    await query(sql, [userId]);
+  }
+
   async markPasswordResetTokenUsed(id: string): Promise<void> {
     const sql = `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`;
     await query(sql, [id]);
