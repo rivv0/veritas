@@ -1,32 +1,48 @@
+import nodemailer, { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 import { config } from '../config';
 
 export class EmailService {
   private resend: Resend | null = null;
+  private smtpTransporter: Transporter | null = null;
 
   constructor() {
+    this.initTransporters();
+  }
+
+  private initTransporters() {
+    if (config.email.smtpUser && config.email.smtpPass) {
+      this.smtpTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: config.email.smtpUser,
+          pass: config.email.smtpPass.replace(/\s+/g, ''), // strip spaces if user pasted "abcd efgh ijkl mnop"
+        },
+      });
+    }
+
     if (config.email.resendApiKey) {
       this.resend = new Resend(config.email.resendApiKey);
     }
   }
 
-  private getClient(): Resend | null {
+  private getSmtpTransporter(): Transporter | null {
+    if (!this.smtpTransporter && config.email.smtpUser && config.email.smtpPass) {
+      this.initTransporters();
+    }
+    return this.smtpTransporter;
+  }
+
+  private getResendClient(): Resend | null {
     if (!this.resend && config.email.resendApiKey) {
-      this.resend = new Resend(config.email.resendApiKey);
+      this.initTransporters();
     }
     return this.resend;
   }
 
   async sendPasswordResetEmail(to: string, resetCode: string): Promise<boolean> {
-    const client = this.getClient();
-    if (!client) {
-      console.warn(`[VERITAS Email] RESEND_API_KEY not configured. Cannot send email to ${to}. Verification Code was: ${resetCode}`);
-      return false;
-    }
-
-    try {
-      const subject = `[VERITAS] Your Password Reset Verification Code: ${resetCode}`;
-      const html = `
+    const subject = `[VERITAS] Your Password Reset Verification Code: ${resetCode}`;
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -73,9 +89,9 @@ export class EmailService {
   </table>
 </body>
 </html>
-      `.trim();
+    `.trim();
 
-      const text = `
+    const text = `
 VERITAS Terminal Security - Password Reset
 ------------------------------------------
 A password reset was requested for your account.
@@ -85,27 +101,57 @@ ${resetCode}
 
 This code expires in 15 minutes.
 If you did not request this reset, you can safely ignore this email.
-      `.trim();
+    `.trim();
 
-      const res = await client.emails.send({
-        from: config.email.fromEmail,
-        to: [to],
-        subject,
-        html,
-        text,
-      });
+    // 1. Try Gmail / SMTP first if configured
+    const smtp = this.getSmtpTransporter();
+    if (smtp) {
+      try {
+        const fromHeader = `VERITAS Terminal <${config.email.smtpUser}>`;
+        await smtp.sendMail({
+          from: fromHeader,
+          to,
+          subject,
+          html,
+          text,
+        });
+        console.log(`[VERITAS Email] Password reset email successfully delivered to ${to} via Gmail SMTP.`);
+        return true;
+      } catch (err: any) {
+        console.error(`[VERITAS Email] Gmail SMTP delivery failed for ${to}:`, err.message || err);
+      }
+    }
 
-      if (res.error) {
-        console.error(`[VERITAS Email] Resend delivery error for ${to}:`, res.error);
+    // 2. Fall back to Resend API if configured
+    const resend = this.getResendClient();
+    if (resend) {
+      try {
+        const res = await resend.emails.send({
+          from: config.email.fromEmail,
+          to: [to],
+          subject,
+          html,
+          text,
+        });
+
+        if (res.error) {
+          console.error(`[VERITAS Email] Resend delivery error for ${to}:`, res.error);
+          return false;
+        }
+
+        console.log(`[VERITAS Email] Password reset email successfully delivered to ${to} via Resend. (ID: ${res.data?.id})`);
+        return true;
+      } catch (err: any) {
+        console.error(`[VERITAS Email] Resend delivery exception for ${to}:`, err.message || err);
         return false;
       }
-
-      console.log(`[VERITAS Email] Password reset email successfully sent to ${to} via Resend. (ID: ${res.data?.id})`);
-      return true;
-    } catch (err: any) {
-      console.error(`[VERITAS Email] Unexpected error sending email to ${to}:`, err.message || err);
-      return false;
     }
+
+    if (!smtp && !resend) {
+      console.warn(`[VERITAS Email] Neither SMTP (Gmail) nor RESEND_API_KEY is configured. Verification code was: ${resetCode}`);
+    }
+
+    return false;
   }
 }
 

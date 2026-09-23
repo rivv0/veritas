@@ -74,6 +74,11 @@ export const config = {
   },
   email: {
     resendApiKey: process.env.RESEND_API_KEY || process.env.resend_api_key || '',
-    fromEmail: process.env.EMAIL_FROM || 'VERITAS <onboarding@resend.dev>',
+    fromEmail: process.env.EMAIL_FROM || process.env.SMTP_USER || 'VERITAS <onboarding@resend.dev>',
+    smtpUser: process.env.SMTP_USER || process.env.smtp_user || '',
+    smtpPass: process.env.SMTP_PASS || process.env.smtp_pass || '',
+    smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+    smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
+    smtpSecure: process.env.SMTP_SECURE !== 'false',
   },
 };
