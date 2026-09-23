@@ -906,11 +906,18 @@ export async function query<T = any>(text: string, params: any[] = []): Promise<
 
 export async function initPostgresSchema() {
   if (!config.postgres.connectionString && (!config.postgres.host || config.postgres.host === 'localhost')) {
+    console.log('[Postgres] No remote DATABASE_URL configured. Operating in In-Memory mode.');
     return;
   }
+  const maskedTarget = config.postgres.connectionString
+    ? config.postgres.connectionString.replace(/:[^:@]+@/, ':***@')
+    : `${config.postgres.host}:${config.postgres.port}`;
+
+  console.log(`[Postgres] Connecting to ${maskedTarget}...`);
   try {
     const client = await pgPool.connect();
     try {
+      console.log('[Postgres] Connection established. Initializing tables...');
       await client.query(`
         CREATE TABLE IF NOT EXISTS users (
             id VARCHAR(64) PRIMARY KEY,

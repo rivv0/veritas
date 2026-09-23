@@ -1,48 +1,20 @@
+import dns from 'dns';
 import nodemailer, { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 import { config } from '../config';
 
 export class EmailService {
   private resend: Resend | null = null;
-  private smtpTransporter: Transporter | null = null;
 
   constructor() {
-    this.initTransporters();
-  }
-
-  private initTransporters() {
-    if (config.email.smtpUser && config.email.smtpPass) {
-      const isPort465 = config.email.smtpPort === 465;
-      this.smtpTransporter = nodemailer.createTransport({
-        host: config.email.smtpHost || 'smtp.gmail.com',
-        port: config.email.smtpPort || 587,
-        secure: isPort465,
-        family: 4, // Force IPv4 to eliminate connect ENETUNREACH on Render
-        auth: {
-          user: config.email.smtpUser,
-          pass: config.email.smtpPass.replace(/\s+/g, ''), // strip spaces if user pasted "abcd efgh ijkl mnop"
-        },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 8000,
-      } as any);
-    }
-
     if (config.email.resendApiKey) {
       this.resend = new Resend(config.email.resendApiKey);
     }
   }
 
-  private getSmtpTransporter(): Transporter | null {
-    if (!this.smtpTransporter && config.email.smtpUser && config.email.smtpPass) {
-      this.initTransporters();
-    }
-    return this.smtpTransporter;
-  }
-
   private getResendClient(): Resend | null {
     if (!this.resend && config.email.resendApiKey) {
-      this.initTransporters();
+      this.resend = new Resend(config.email.resendApiKey);
     }
     return this.resend;
   }
@@ -110,19 +82,48 @@ This code expires in 15 minutes.
 If you did not request this reset, you can safely ignore this email.
     `.trim();
 
-    // 1. Try Gmail / SMTP first if configured
-    const smtp = this.getSmtpTransporter();
-    if (smtp) {
+    // 1. Try Gmail / SMTP first if configured (guaranteed IPv4 routing to prevent Render ENETUNREACH)
+    if (config.email.smtpUser && config.email.smtpPass) {
       try {
+        const rawHost = config.email.smtpHost || 'smtp.gmail.com';
+        let connectHost = rawHost;
+
+        try {
+          const ipv4List = await dns.promises.resolve4(rawHost);
+          if (ipv4List && ipv4List.length > 0) {
+            connectHost = ipv4List[0];
+            console.log(`[VERITAS Email] Resolved ${rawHost} to IPv4 address: ${connectHost}`);
+          }
+        } catch (dnsErr: any) {
+          console.warn(`[VERITAS Email] IPv4 lookup failed for ${rawHost}, using raw hostname:`, dnsErr.message);
+        }
+
+        const isPort465 = config.email.smtpPort === 465;
+        const transporter: Transporter = nodemailer.createTransport({
+          host: connectHost,
+          port: config.email.smtpPort || 587,
+          secure: isPort465,
+          tls: {
+            servername: rawHost, // Crucial: validates TLS certificate against the canonical hostname
+          },
+          auth: {
+            user: config.email.smtpUser,
+            pass: config.email.smtpPass.replace(/\s+/g, ''),
+          },
+          connectionTimeout: 8000,
+          greetingTimeout: 8000,
+          socketTimeout: 8000,
+        });
+
         const fromHeader = `VERITAS Terminal <${config.email.smtpUser}>`;
-        await smtp.sendMail({
+        await transporter.sendMail({
           from: fromHeader,
           to,
           subject,
           html,
           text,
         });
-        console.log(`[VERITAS Email] Password reset email successfully delivered to ${to} via Gmail SMTP.`);
+        console.log(`[VERITAS Email] Password reset email successfully delivered to ${to} via Gmail SMTP (${connectHost}).`);
         return true;
       } catch (err: any) {
         console.error(`[VERITAS Email] Gmail SMTP delivery failed for ${to}:`, err.message || err);
@@ -154,7 +155,7 @@ If you did not request this reset, you can safely ignore this email.
       }
     }
 
-    if (!smtp && !resend) {
+    if (!config.email.smtpUser && !resend) {
       console.warn(`[VERITAS Email] Neither SMTP (Gmail) nor RESEND_API_KEY is configured. Verification code was: ${resetCode}`);
     }
 
