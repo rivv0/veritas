@@ -12,7 +12,7 @@
 
 **Sub-50ms streaming market telemetry, automated bull-trap detection, institutional flow analysis, and session delta intelligence for active equity & derivative traders.**
 
-[Features](#-key-features) • [Architecture](#-system-architecture) • [Signal Engine](#-quantitative-signal-engine) • [API Specs](#-api--websocket-reference) • [Getting Started](#-getting-started) • [Deployment](#-deployment)
+
 
 </div>
 
@@ -94,7 +94,7 @@ flowchart TB
 
 ---
 
-## ⚡ Key Features
+##  Key Features
 
 ### 1. Real-Time Watchlist & Drag-and-Drop Organization
 - **Ultra-Fast Streaming**: Live Last Traded Price (LTP), net displacement, percentage change, and volume updated in real time via WebSockets.
@@ -161,7 +161,7 @@ Clicking any symbol or sparkline opens the **VERITAS Institutional Chart Termina
 
 ---
 
-## 📂 Repository Structure
+##  Repository Structure
 
 ```
 smart-watchlist/
@@ -372,7 +372,7 @@ Visit [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 📡 API & WebSocket Reference
+##  API & WebSocket Reference
 
 ### REST API Endpoints
 
@@ -498,7 +498,7 @@ Clients establish a single WebSocket connection to receive real-time ticks and h
 
 ---
 
-## ⚙️ Environment Variables
+##  Environment Variables
 
 ### Backend Configuration (`backend/.env`)
 
@@ -525,7 +525,7 @@ Clients establish a single WebSocket connection to receive real-time ticks and h
 ---
 
 
-## 🔬 Testing & Interactive Demo Scenarios
+##  Testing & Interactive Demo Scenarios
 
 VERITAS is pre-configured with realistic scenarios for evaluation:
 
